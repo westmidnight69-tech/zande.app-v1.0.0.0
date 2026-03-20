@@ -46,37 +46,16 @@ export default function Signup() {
 
       if (error) throw error;
       
-      let currentSession = data.session;
-
-      if (!currentSession) {
-        setSuccessMsg('Account created. Synchronizing session...');
-        
-        // Auto-login fallback: Directly attempt to sign in if no session returned
-        try {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          
-          if (!signInError && signInData.session) {
-            currentSession = signInData.session;
-          } else if (signInError && signInError.message.toLowerCase().includes('confirm')) {
-            setSuccessMsg('Account created! Please check your email to confirm your account before proceeding.');
-          }
-        } catch (e) {
-          console.error('Auto-login fallback failed:', e);
-        }
-      }
+      const currentSession = data.session;
 
       if (currentSession) {
+        // If we got a session immediately (verification off), redirect
         navigate('/onboarding', { replace: true });
         return;
       }
 
-      // If we still don't have a session, show the final message
-      if (successMsg && !successMsg.includes('email')) {
-        setSuccessMsg('Account created successfully! Please click the button below to proceed.');
-      }
+      // If no session, it means email verification is likely ON
+      setSuccessMsg('Account created! Please check your email to confirm your account before proceeding.');
       
     } catch (err: unknown) {
       const error = err as Error;

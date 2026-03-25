@@ -26,8 +26,17 @@ interface Client {
 }
 
 interface InvoiceItem {
+  id?: string;
   description: string;
   quantity: number;
+  unit_price: number;
+  catalogue_item_id?: string;
+}
+
+interface CatalogueItem {
+  id: string;
+  name: string;
+  description: string;
   unit_price: number;
 }
 
@@ -35,6 +44,7 @@ export default function Invoices() {
   const { business, user, sessionId } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [catalogueItems, setCatalogueItems] = useState<CatalogueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('ALL');
@@ -74,6 +84,16 @@ export default function Invoices() {
     if (data) setClients(data);
   };
 
+  const fetchCatalogueItems = async () => {
+    if (!business?.id) return;
+    const { data } = await supabase
+      .from('catalogue_items')
+      .select('id, name, description, unit_price')
+      .eq('business_id', business.id)
+      .order('name');
+    if (data) setCatalogueItems(data);
+  };
+
   const fetchInvoices = async () => {
     if (!business?.id) return;
     setLoading(true);
@@ -98,8 +118,16 @@ export default function Invoices() {
   };
 
   useEffect(() => {
-    fetchInvoices();
-    fetchClients();
+    if (business?.id) {
+      fetchClients();
+      fetchCatalogueItems();
+    }
+  }, [business?.id]);
+
+  useEffect(() => {
+    if (business?.id) {
+      fetchInvoices();
+    }
   }, [activeTab, sortBy, sortOrder, business?.id]);
 
 
@@ -361,7 +389,8 @@ export default function Invoices() {
         line_total: item.quantity * item.unit_price,
         vat_rate: 15,
         vat_amount: (item.quantity * item.unit_price) * 0.15,
-        sort_order: idx + 1
+        sort_order: idx + 1,
+        catalogue_item_id: item.catalogue_item_id
       })));
 
     if (itemsError) {
@@ -723,16 +752,37 @@ export default function Invoices() {
                         <span className="material-symbols-outlined text-[18px]">delete</span>
                       </button>
                     )}
-                    <Input 
-                       label="Description"
-                       placeholder="Service or Product name"
-                       value={item.description}
-                       onChange={(e) => {
-                         const newItems = [...items];
-                         newItems[idx].description = e.target.value;
-                         setItems(newItems);
-                       }}
-                    />
+                    <div className="space-y-3">
+                      <Select 
+                        label="Choose from Catalogue (Optional)"
+                        options={[
+                          { value: '', label: '-- Select Item --' },
+                          ...catalogueItems.map(ci => ({ value: ci.id, label: `${ci.name} (R${ci.unit_price.toFixed(2)})` }))
+                        ]}
+                        value={item.catalogue_item_id || ''}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          const selectedItem = catalogueItems.find(ci => ci.id === selectedId);
+                          const newItems = [...items];
+                          newItems[idx].catalogue_item_id = selectedId;
+                          if (selectedItem) {
+                            newItems[idx].description = selectedItem.name;
+                            newItems[idx].unit_price = selectedItem.unit_price;
+                          }
+                          setItems(newItems);
+                        }}
+                      />
+                      <Input 
+                        label="Description"
+                        placeholder="Service or Product name"
+                        value={item.description}
+                        onChange={(e) => {
+                          const newItems = [...items];
+                          newItems[idx].description = e.target.value;
+                          setItems(newItems);
+                        }}
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <Input 
                          label="Qty"

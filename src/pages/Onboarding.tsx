@@ -13,37 +13,22 @@ const entityTypes = [
 ];
 
 export default function Onboarding() {
-  const { user } = useAuth();
+  const { user, business, loading: authLoading, refreshBusiness } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // If business already exists, we shouldn't be here
+    if (!authLoading && business) {
+      navigate('/', { replace: true });
+    }
+  }, [business, authLoading, navigate]);
 
   const [formData, setFormData] = useState({
     name: '',
     entity_type: 'PTY_LTD',
     registration_number: ''
   });
-
-  useEffect(() => {
-    // Check if the user already has a business
-    async function checkExistingBusiness() {
-      if (!user) return;
-      const { data } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (data) {
-        // Business exists, go to dashboard
-        navigate('/', { replace: true });
-      } else {
-        setChecking(false);
-      }
-    }
-
-    checkExistingBusiness();
-  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,17 +50,22 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      navigate('/', { replace: true });
+      // Refresh business profile in context
+      await refreshBusiness();
+      
+      // Navigation will be handled by the useEffect above once business is updated
     } catch (error: any) {
       alert(error.message || 'Failed to create business profile.');
       setLoading(false);
     }
   };
 
-  if (checking) {
+  if (authLoading || (loading && !business)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-primary">Loading...</div>
+        <div className="text-primary font-mono text-sm tracking-widest uppercase animate-pulse">
+          {loading ? 'Setting up business...' : 'Loading...'}
+        </div>
       </div>
     );
   }

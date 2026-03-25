@@ -28,6 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [business, setBusiness] = useState<any | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use refs to prevent concurrent/redundant processing of the same user state
+  const lastProcessedUserId = React.useRef<string | null>(undefined as any);
+  const initializationPromise = React.useRef<Promise<void> | null>(null);
 
   const syncSession = async (userId: string, businessId?: string) => {
     try {
@@ -46,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return existingSession.id;
       }
 
-      // Create a new session record
+      // Create a new session record - use a more robust insert
       const { data: newSession, error: createError } = await supabase
         .from('user_sessions')
         .insert([{
@@ -54,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           business_id: businessId || null,
           user_agent: window.navigator.userAgent,
           device_type: /Mobi|Android/i.test(window.navigator.userAgent) ? 'mobile' : 'desktop',
-          browser: 'Generic Browser', // Could be more specific with a library
+          browser: 'Generic Browser',
           os: window.navigator.platform,
           is_active: true
         }])
@@ -90,6 +94,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleAuthUpdate = async (newSession: Session | null) => {
+    const userId = newSession?.user?.id ?? null;
+    
+    // Skip if we've already processed this user state
+    if (userId === lastProcessedUserId.current) {
+      setLoading(false);
+      return;
+    }
+    lastProcessedUserId.current = userId;
+
+    setSession(newSession);
+    setUser(newSession?.user ?? null);
+    
+    try {
+      if (newSession?.user) {
+        await Promise.all([
+          fetchBusiness(newSession.user.id),
+          syncSession(newSession.user.id)
+        ]);
+      } else {
+        setBusiness(null);
+        setSessionId(null);
+      }
+    } catch (err) {
+      console.error('Data fetching error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshBusiness = async () => {
     if (user) {
       await fetchBusiness(user.id);
@@ -97,32 +131,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchBusiness(session.user.id);
-        syncSession(session.user.id);
-      }
+    // 15 second safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
       setLoading(false);
+      console.warn('Auth initialization timed out - forcing loading false');
+    }, 15000);
+
+    const performInit = async () => {
+      try {
+        let { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const devEmail = import.meta.env.VITE_DEV_LOGIN_EMAIL;
+        const devPass = import.meta.env.VITE_DEV_LOGIN_PASSWORD;
+
+        if (!currentSession && isLocalhost && devEmail && devPass && devPass !== 'YourPasswordHere') {
+          const hasTried = sessionStorage.getItem('zande_auto_login_tried');
+          if (!hasTried) {
+            sessionStorage.setItem('zande_auto_login_tried', 'true');
+            try {
+              const { data } = await supabase.auth.signInWithPassword({
+                email: devEmail,
+                password: devPass,
+              });
+              if (data.session) currentSession = data.session;
+            } catch (e) {
+              console.error('Auto-login failed:', e);
+            }
+          }
+        }
+
+        await handleAuthUpdate(currentSession);
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        setLoading(false);
+      }
+    };
+
+    initializationPromise.current = performInit();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (initializationPromise.current) {
+        await initializationPromise.current;
+      }
+      handleAuthUpdate(newSession);
     });
 
-    // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchBusiness(session.user.id);
-        syncSession(session.user.id);
-      } else {
-        setBusiness(null);
-        setSessionId(null);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

@@ -24,25 +24,24 @@ export default function Reports() {
     totalExpenses: 0,
     netProfit: 0,
     margin: 0,
-    categorySplit: [] as { name: string; value: number }[]
+    categorySplit: [] as { name: string; value: number }[],
+    topSellingItems: [] as { name: string; value: number }[]
   });
 
   const fetchAnalytics = async () => {
     if (!business?.id) return;
     setLoading(true);
     
-    // Fetch Invoices for Revenue
-    const { data: invoices } = await supabase
-      .from('invoices')
-      .select('total, issue_date')
-      .eq('business_id', business.id)
-      .not('status', 'eq', 'VOID');
-
-    // Fetch Expenses
-    const { data: expenses } = await supabase
-      .from('expenses')
-      .select('amount, expense_date, category')
-      .eq('business_id', business.id);
+    // Parallel fetch for raw data
+    const [
+      { data: invoices },
+      { data: expenses },
+      { data: salesData }
+    ] = await Promise.all([
+      supabase.from('invoices').select('total, issue_date').eq('business_id', business.id).not('status', 'eq', 'VOID'),
+      supabase.from('expenses').select('amount, expense_date, category').eq('business_id', business.id),
+      supabase.from('line_items').select('quantity, line_total, catalogue_items(name), invoices!inner(business_id, status)').eq('invoices.business_id', business.id).not('invoices.status', 'eq', 'VOID').not('catalogue_item_id', 'is', null)
+    ]);
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
@@ -72,6 +71,7 @@ export default function Reports() {
       }
     });
 
+    // Expenses category split
     const categoryTotals: Record<string, number> = {};
     expenses?.forEach(exp => {
       categoryTotals[exp.category] = (categoryTotals[exp.category] || 0) + Number(exp.amount);
@@ -81,13 +81,25 @@ export default function Reports() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
+    // Top Selling Items (by revenue)
+    const itemSales: Record<string, number> = {};
+    salesData?.forEach((li: any) => {
+      const itemName = li.catalogue_items?.name || 'Unknown Item';
+      itemSales[itemName] = (itemSales[itemName] || 0) + Number(li.line_total);
+    });
+
+    const topSellingItems = Object.entries(itemSales)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
     setAnalyticsData(monthlyData);
     setMetrics({
       totalRevenue: totalRev,
       totalExpenses: totalExp,
       netProfit: totalRev - totalExp,
       margin: totalRev > 0 ? ((totalRev - totalExp) / totalRev) * 100 : 0,
-      categorySplit: categorySplit
+      categorySplit,
+      topSellingItems
     });
     setLoading(false);
   };
@@ -203,19 +215,19 @@ export default function Reports() {
            </div>
         </div>
 
-        {/* Secondary Analytics */}
+        {/* Secondary Analytics - Expenses */}
         <div className="bg-surface border border-border-subtle p-6 rounded-3xl flex flex-col">
-           <h2 className="font-display text-xl font-bold text-slate-100 tracking-tight mb-2">Category Split</h2>
-           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-8">Top Expense Channels</p>
-                      <div className="flex-1 min-h-[250px] relative">
+           <h2 className="font-display text-xl font-bold text-slate-100 tracking-tight mb-2">Expense Mix</h2>
+           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-8">Top Overhead Channels</p>
+           <div className="flex-1 min-h-[200px] relative">
               <ResponsiveContainer width="100%" height="100%">
                  <PieChart>
                     <Pie
                       data={metrics.categorySplit.length > 0 ? metrics.categorySplit : [{ name: 'No Data', value: 1 }]}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
+                      innerRadius={50}
+                      outerRadius={70}
                       paddingAngle={5}
                       dataKey="value"
                     >
@@ -231,28 +243,61 @@ export default function Reports() {
                     />
                  </PieChart>
               </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                 <div className="text-center">
-                    <p className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Total</p>
-                    <p className="text-lg font-bold text-white leading-tight">
-                       {metrics.categorySplit.length > 0 ? '100%' : '0%'}
-                    </p>
-                 </div>
-              </div>
            </div>
-
-           <div className="mt-6 space-y-2">
-              {metrics.categorySplit.slice(0, 4).map((cat, i) => (
+           <div className="mt-4 space-y-2">
+              {metrics.categorySplit.slice(0, 3).map((cat, i) => (
                 <div key={cat.name} className="flex items-center justify-between">
                    <div className="flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest truncate max-w-[100px]">{cat.name.replace('_', ' ')}</span>
+                      <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest truncate max-w-[80px]">{cat.name.replace('_', ' ')}</span>
                    </div>
-                   <span className="text-[10px] font-mono text-white font-bold">{fmt(cat.value)}</span>
+                   <span className="text-[9px] font-mono text-white font-bold">{fmt(cat.value)}</span>
                 </div>
               ))}
-              {metrics.categorySplit.length === 0 && (
-                <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest text-center py-4">No expense data available</p>
+           </div>
+        </div>
+
+        {/* Secondary Analytics - Sales */}
+        <div className="bg-surface border border-border-subtle p-6 rounded-3xl flex flex-col">
+           <h2 className="font-display text-xl font-bold text-slate-100 tracking-tight mb-2">Top Selling</h2>
+           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-8">Product Revenue Split</p>
+           <div className="flex-1 min-h-[200px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                 <PieChart>
+                    <Pie
+                      data={metrics.topSellingItems.length > 0 ? metrics.topSellingItems : [{ name: 'No Data', value: 1 }]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {metrics.topSellingItems.length > 0 ? 
+                        metrics.topSellingItems.map((_, index) => (
+                           <Cell key={`cell-sales-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
+                        )) : 
+                        <Cell fill="#1e293b" />
+                      }
+                    </Pie>
+                    <Tooltip 
+                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }}
+                    />
+                 </PieChart>
+              </ResponsiveContainer>
+           </div>
+           <div className="mt-4 space-y-2">
+              {metrics.topSellingItems.slice(0, 3).map((item, i) => (
+                <div key={item.name} className="flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: COLORS[(i + 2) % COLORS.length] }} />
+                      <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest truncate max-w-[80px]">{item.name}</span>
+                   </div>
+                   <span className="text-[9px] font-mono text-white font-bold">{fmt(item.value)}</span>
+                </div>
+              ))}
+              {metrics.topSellingItems.length === 0 && (
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest text-center py-4">No sales data available</p>
               )}
            </div>
         </div>

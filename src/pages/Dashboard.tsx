@@ -66,42 +66,40 @@ export default function Dashboard() {
       const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
 
-      // Parallel fetch for current and previous month data
+      // Parallel fetch for consolidated data
       const [
-        expensesThisResult, 
-        paymentsThisResult,
-        expensesPrevResult,
-        paymentsPrevResult,
+        expensesResult, 
+        paymentsResult,
         clientsCountResult,
-        allActiveInvoicesResult,
-        draftsResult
+        invoicesResult
       ] = await Promise.all([
-        // Current Month
-        supabase.from('expenses').select('amount').eq('business_id', business.id).gte('expense_date', firstOfThisMonth).lte('expense_date', lastOfThisMonth),
-        supabase.from('payments').select('amount').eq('business_id', business.id).gte('payment_date', firstOfThisMonth).lte('payment_date', lastOfThisMonth),
-        
-        // Previous Month
-        supabase.from('expenses').select('amount').eq('business_id', business.id).gte('expense_date', firstOfLastMonth).lte('expense_date', lastOfLastMonth),
-        supabase.from('payments').select('amount').eq('business_id', business.id).gte('payment_date', firstOfLastMonth).lte('payment_date', lastOfLastMonth),
-        
-        // General Stats
+        // Fetch expenses for both months in one go
+        supabase.from('expenses').select('amount, expense_date').eq('business_id', business.id).gte('expense_date', firstOfLastMonth).lte('expense_date', lastOfThisMonth),
+        // Fetch payments for both months in one go
+        supabase.from('payments').select('amount, payment_date').eq('business_id', business.id).gte('payment_date', firstOfLastMonth).lte('payment_date', lastOfThisMonth),
+        // Keep clients count as is (it's a fast head request)
         supabase.from('clients').select('id', { count: 'exact', head: true }).eq('business_id', business.id).eq('is_active', true),
-        supabase.from('invoices').select('amount_due, status').eq('business_id', business.id).not('status', 'in', '("PAID","VOID","DRAFT")'),
-        supabase.from('invoices').select('total').eq('business_id', business.id).eq('status', 'DRAFT')
+        // Consolidate all relevant invoices in one go
+        supabase.from('invoices').select('amount_due, status, total').eq('business_id', business.id)
       ]);
 
       const sum = (arr: any[], key: string) => arr?.reduce((acc, curr) => acc + Number(curr[key] || 0), 0) || 0;
 
-      const totalCollectedThis = sum(paymentsThisResult.data || [], 'amount');
-      const totalCollectedPrev = sum(paymentsPrevResult.data || [], 'amount');
-      
-      const totalExpensesThis = sum(expensesThisResult.data || [], 'amount');
-      const totalExpensesPrev = sum(expensesPrevResult.data || [], 'amount');
+      // Filter expenses/payments in memory
+      const expenses = expensesResult.data || [];
+      const payments = paymentsResult.data || [];
+      const allInvoices = invoicesResult.data || [];
 
-      const allActiveInvoices = allActiveInvoicesResult.data || [];
-      const totalOutstanding = sum(allActiveInvoices, 'amount_due');
-      const overdueCount = allActiveInvoices.filter(i => i.status === 'OVERDUE').length;
-      const draftsTotal = sum(draftsResult.data || [], 'total');
+      const totalExpensesThis = sum(expenses.filter(e => e.expense_date >= firstOfThisMonth), 'amount');
+      const totalExpensesPrev = sum(expenses.filter(e => e.expense_date >= firstOfLastMonth && e.expense_date <= lastOfLastMonth), 'amount');
+      
+      const totalCollectedThis = sum(payments.filter(p => p.payment_date >= firstOfThisMonth), 'amount');
+      const totalCollectedPrev = sum(payments.filter(p => p.payment_date >= firstOfLastMonth && p.payment_date <= lastOfLastMonth), 'amount');
+
+      const activeInvoices = allInvoices.filter(i => !['PAID', 'VOID', 'DRAFT'].includes(i.status));
+      const totalOutstanding = sum(activeInvoices, 'amount_due');
+      const overdueCount = activeInvoices.filter(i => i.status === 'OVERDUE').length;
+      const draftsTotal = sum(allInvoices.filter(i => i.status === 'DRAFT'), 'total');
 
       const calculateTrend = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? { percentage: 100, isIncrease: true } : null;

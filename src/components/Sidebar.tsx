@@ -5,6 +5,7 @@ const navItems = [
   { name: 'Dashboard', path: '/', icon: 'dashboard' },
   { name: 'Clients', path: '/clients', icon: 'group' },
   { name: 'Invoices', path: '/invoices', icon: 'description' },
+  { name: 'Catalogue', path: '/catalogue', icon: 'inventory_2' },
   { name: 'Payments', path: '/payments', icon: 'payments' },
   { name: 'Expenses', path: '/expenses', icon: 'receipt_long' },
   { name: 'Documents', path: '/documents', icon: 'folder' },

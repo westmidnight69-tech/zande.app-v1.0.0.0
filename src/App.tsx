@@ -11,6 +11,7 @@ import Documents from './pages/Documents';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Reconciliation from './pages/Reconciliation';
+import Catalogue from './pages/Catalogue';
 
 import { AuthProvider } from './components/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -31,6 +32,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="invoices" element={<Invoices />} />
+              <Route path="catalogue" element={<Catalogue />} />
               <Route path="clients" element={<Clients />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="expenses" element={<Expenses />} />

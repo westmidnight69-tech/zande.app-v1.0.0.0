@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Input, Select, PrimaryButton } from '../components/FormInputs';
+import { safeRequest } from '../lib/supabase-utils';
 
 const entityTypes = [
+// ... (omitting for brevity in TargetContent if needed, but I'll specify range carefully)
   { value: 'PTY_LTD', label: 'Private Company (Pty Ltd)' },
   { value: 'SOLE_PROP', label: 'Sole Proprietor' },
   { value: 'PARTNERSHIP', label: 'Partnership' },
@@ -37,7 +39,7 @@ export default function Onboarding() {
     setLoading(true);
 
     try {
-      const { error } = await supabase
+      const { error } = await safeRequest(() => supabase
         .from('businesses')
         .insert({
           owner_id: user.id,
@@ -46,12 +48,13 @@ export default function Onboarding() {
           registration_number: formData.registration_number,
           onboarding_complete: true,
           email: user.email // Set initial email contact to user email
-        });
+        })
+      );
 
       if (error) throw error;
 
       // Refresh business profile in context
-      await refreshBusiness();
+      await safeRequest(() => refreshBusiness());
       
       // Navigation will be handled by the useEffect above once business is updated
     } catch (error: any) {

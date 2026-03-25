@@ -33,8 +33,15 @@ export default function Signup() {
     setError(null);
     setSuccessMsg(null);
 
+    const signupTimeout = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        setError('The request is taking longer than expected. Please check your internet connection or try again in a few minutes. (Note: Account creation may still be processing in the background)');
+      }
+    }, 20000); // 20 second timeout for the UI state
+
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signupError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -46,7 +53,14 @@ export default function Signup() {
         }
       });
 
-      if (error) throw error;
+      clearTimeout(signupTimeout);
+
+      if (signupError) {
+        if (signupError.message.includes('rate limit')) {
+          throw new Error('You have requested too many signups in a short period. Please wait an hour before trying again.');
+        }
+        throw signupError;
+      }
       
       const currentSession = data.session;
 
@@ -65,11 +79,14 @@ export default function Signup() {
       setSuccessMsg('Account created! Please check your email to confirm your account before proceeding.');
       
     } catch (err: unknown) {
+      clearTimeout(signupTimeout);
       const error = err as Error;
       console.error('Signup error:', error);
       setError(error.message || 'Error creating account. Please try again.');
     } finally {
-      setLoading(false);
+      if (!isSignedUp) {
+        setLoading(false);
+      }
     }
   };
 

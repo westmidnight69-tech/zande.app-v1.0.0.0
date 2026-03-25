@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { safeRequest } from '../lib/supabase-utils';
 
 interface AuthContextType {
   session: Session | null;
@@ -36,14 +37,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const syncSession = async (userId: string, businessId?: string) => {
     try {
       // Check for an existing active session in our table
-      const { data: existingSession } = await supabase
+      const { data: existingSession } = await safeRequest(() => supabase
         .from('user_sessions')
         .select('id')
         .eq('user_id', userId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle()
+      );
 
       if (existingSession) {
         setSessionId(existingSession.id);
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Create a new session record - use a more robust insert
-      const { data: newSession, error: createError } = await supabase
+      const { data: newSession, error: createError } = await safeRequest(() => supabase
         .from('user_sessions')
         .insert([{
           user_id: userId,
@@ -63,7 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_active: true
         }])
         .select()
-        .single();
+        .single()
+      );
 
       if (!createError && newSession) {
         setSessionId(newSession.id);
@@ -77,11 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchBusiness = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await safeRequest(() => supabase
         .from('businesses')
         .select('*')
         .eq('owner_id', userId)
-        .maybeSingle();
+        .maybeSingle()
+      );
       
       if (!error && data) {
         setBusiness(data);

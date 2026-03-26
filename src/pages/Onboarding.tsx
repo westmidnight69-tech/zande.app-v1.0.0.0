@@ -14,14 +14,14 @@ const entityTypes = [
   { value: 'NPO', label: 'Non-Profit Organisation' }
 ];
 
-export default function Onboarding() {
-  const { user, business, loading: authLoading, refreshBusiness } = useAuth();
+  export default function Onboarding() {
+  const { user, business, loading: authLoading, refreshBusiness, setBusiness } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // If business already exists, we shouldn't be here
-    if (!authLoading && business) {
+    if (!authLoading && business && business.onboarding_complete) {
       navigate('/', { replace: true });
     }
   }, [business, authLoading, navigate]);
@@ -39,7 +39,7 @@ export default function Onboarding() {
     setLoading(true);
 
     try {
-      const { error } = await safeRequest(() => supabase
+      const { data: newBusiness, error } = await safeRequest(() => supabase
         .from('businesses')
         .insert({
           owner_id: user.id,
@@ -49,14 +49,22 @@ export default function Onboarding() {
           onboarding_complete: true,
           email: user.email // Set initial email contact to user email
         })
+        .select()
+        .single()
       );
 
       if (error) throw error;
 
-      // Refresh business profile in context
-      await safeRequest(() => refreshBusiness());
-      
-      // Navigation will be handled by the useEffect above once business is updated
+      // Unblock UI instantly by setting business locally
+      if (newBusiness) {
+        setBusiness(newBusiness);
+      }
+
+      // Refresh in background to sync any trigger-based DB fields
+      refreshBusiness().catch(console.error);
+
+      // Navigate instantly
+      navigate('/', { replace: true });
     } catch (error: any) {
       alert(error.message || 'Failed to create business profile.');
       setLoading(false);

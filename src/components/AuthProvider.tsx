@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshBusiness: () => Promise<void>;
+  setBusiness: (business: any | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshBusiness: async () => {},
+  setBusiness: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -198,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, business, sessionId, loading, signOut, refreshBusiness }}>
+    <AuthContext.Provider value={{ session, user, business, sessionId, loading, signOut, refreshBusiness, setBusiness }}>
       {children}
     </AuthContext.Provider>
   );

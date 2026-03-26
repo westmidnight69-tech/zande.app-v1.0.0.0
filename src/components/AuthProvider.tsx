@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Use refs to prevent concurrent/redundant processing of the same user state
   const lastProcessedUserId = React.useRef<string | null>(undefined as any);
   const initializationPromise = React.useRef<Promise<void> | null>(null);
+  // Guard against concurrent auth events firing simultaneously (e.g. getSession + onAuthStateChange)
+  const isHandlingAuth = React.useRef(false);
 
   const syncSession = async (userId: string, businessId?: string) => {
     try {
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return existingSession.id;
       }
 
-      // Create a new session record - use a more robust insert
+      // Create a new session record
       const { data: newSession, error: createError } = await safeRequest(() => supabase
         .from('user_sessions')
         .insert([{
@@ -101,11 +103,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleAuthUpdate = async (newSession: Session | null) => {
+    // Drop concurrent calls — only one auth update should run at a time per tab
+    if (isHandlingAuth.current) return;
+    isHandlingAuth.current = true;
+
     const userId = newSession?.user?.id ?? null;
     
     // Skip if we've already processed this user state
     if (userId === lastProcessedUserId.current) {
       setLoading(false);
+      isHandlingAuth.current = false;
       return;
     }
     lastProcessedUserId.current = userId;
@@ -127,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Data fetching error:', err);
     } finally {
       setLoading(false);
+      isHandlingAuth.current = false;
     }
   };
 

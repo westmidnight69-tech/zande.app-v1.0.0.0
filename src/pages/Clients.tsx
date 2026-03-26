@@ -268,7 +268,7 @@ export default function Clients() {
             value={newClient.email}
             onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input 
               label="Phone Number" 
               placeholder="+27..."

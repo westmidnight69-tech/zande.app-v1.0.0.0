@@ -216,7 +216,7 @@ export default function Expenses() {
       </header>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         <div className="bg-surface border border-border-subtle p-5 rounded-2xl relative overflow-hidden group">
           <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-bold mb-1">Monthly Burn</p>
           {loading ? <Skeleton className="w-24 h-6" /> : (
@@ -373,7 +373,7 @@ export default function Expenses() {
             value={newExpense.description}
             onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input 
               label="Supplier" 
               placeholder="Store / Vendor name"
@@ -389,7 +389,7 @@ export default function Expenses() {
               onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select 
               label="Category"
               options={[

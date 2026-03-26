@@ -645,7 +645,7 @@ export default function Invoices() {
       >
         <form className="space-y-8">
           {/* Header Info */}
-          <section className="grid grid-cols-2 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
              <div className="col-span-2">
                {!isNewClient ? (
                  <div className="space-y-2">
@@ -783,7 +783,7 @@ export default function Invoices() {
                         }}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Input 
                          label="Qty"
                          type="number"

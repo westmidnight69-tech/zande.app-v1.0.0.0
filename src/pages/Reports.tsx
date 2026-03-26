@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -28,7 +28,7 @@ export default function Reports() {
     topSellingItems: [] as { name: string; value: number }[]
   });
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     if (!business?.id) return;
     setLoading(true);
     
@@ -38,7 +38,7 @@ export default function Reports() {
       { data: expenses },
       { data: salesData }
     ] = await Promise.all([
-      supabase.from('invoices').select('total, issue_date').eq('business_id', business.id).not('status', 'eq', 'VOID'),
+      supabase.from('invoices').select('total, issue_date').eq('business_id', business.id).neq('status', 'VOID'),
       supabase.from('expenses').select('amount, expense_date, category').eq('business_id', business.id),
       supabase.from('line_items').select('quantity, line_total, catalogue_items(name), invoices!inner(business_id, status)').eq('invoices.business_id', business.id).not('invoices.status', 'eq', 'VOID').not('catalogue_item_id', 'is', null)
     ]);
@@ -102,13 +102,13 @@ export default function Reports() {
       topSellingItems
     });
     setLoading(false);
-  };
+  }, [business?.id]);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [business?.id]);
+  }, [fetchAnalytics]);
 
-  const fmt = (v: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(v);
+  const fmt = useMemo(() => (v: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(v), []);
 
   if (loading) {
     return (
@@ -138,7 +138,7 @@ export default function Reports() {
       </header>
 
       {/* KPI Stream */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Revenue (YTD)', value: metrics.totalRevenue, color: 'text-white' },
           { label: 'Burn Rate', value: metrics.totalExpenses, color: 'text-slate-400' },

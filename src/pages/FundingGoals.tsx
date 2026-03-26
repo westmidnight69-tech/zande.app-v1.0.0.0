@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthProvider';
 import Header from '../components/Header';
@@ -51,13 +51,7 @@ export default function MyGrowth() {
   // Local state for dopamine checkmarks
   const [milestones, setMilestones] = useState<MilestoneState>({});
 
-  useEffect(() => {
-    if (business?.id) {
-      fetchDashboardData();
-    }
-  }, [business?.id]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     
     // Fetch all required live data concurrently
@@ -74,11 +68,15 @@ export default function MyGrowth() {
     if (goalsRes.data) setGoals(goalsRes.data);
 
     setLoading(false);
-  };
+  }, [business?.id]);
 
-  const toggleMilestone = (id: string) => {
+  useEffect(() => {
+    if (business?.id) fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const toggleMilestone = useCallback((id: string) => {
     setMilestones(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  }, []);
 
   // ==========================================
   // METRICS ENGINE (Live Data Calculation)

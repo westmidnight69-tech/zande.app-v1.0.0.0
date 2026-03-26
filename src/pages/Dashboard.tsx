@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Header from '../components/Header';
@@ -54,8 +54,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { business } = useAuth();
 
-  useEffect(() => {
-    async function fetchStats() {
+  const fetchStats = useCallback(async () => {
       if (!business?.id) return;
       setLoading(true);
       
@@ -121,11 +120,13 @@ export default function Dashboard() {
       });
       
       setLoading(false);
-    }
-    fetchStats();
   }, [business?.id]);
 
-  const fmt = (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const fmt = useMemo(() => (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, []);
 
   return (
     <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -154,7 +155,7 @@ export default function Dashboard() {
       </section>
 
       {/* Stats Grid - 2x2 */}
-      <section className="grid grid-cols-2 gap-4 mb-10">
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
         <StatusCard 
           label="Collected" 
           value={fmt(stats?.totalRevenue ?? 0)} 
@@ -206,7 +207,7 @@ export default function Dashboard() {
       </section>
 
       {/* Quick Actions Row */}
-      <section className="grid grid-cols-3 gap-3">
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
         <button 
           onClick={() => navigate('/invoices')}
           className="flex flex-col items-center justify-center py-4 rounded-xl bg-surface border border-border-subtle hover:bg-surface-muted transition-all gap-2 group"

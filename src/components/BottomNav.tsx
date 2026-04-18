@@ -6,7 +6,7 @@ export default function BottomNav() {
     { name: 'Invoices', path: '/invoices', icon: 'description' },
     { name: 'Expenses', path: '/expenses', icon: 'receipt_long' },
     { name: 'Bank', path: '/bank', icon: 'account_balance' },
-    { name: 'More', path: '/settings', icon: 'more_horiz' },
+    { name: 'More', path: '/more', icon: 'more_horiz' },
   ];
 
   return (

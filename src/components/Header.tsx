@@ -7,6 +7,13 @@ export default function Header() {
     ? business.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     : '??';
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   return (
     <header className="flex items-center justify-between py-6 px-4 sm:px-0">
       <div className="flex items-center gap-4">
@@ -14,7 +21,7 @@ export default function Header() {
           {initials}
         </div>
         <div>
-          <p className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em] mb-0.5">Good Morning</p>
+          <p className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em] mb-0.5">{getGreeting()}</p>
           <h1 className="font-display text-xl font-bold text-slate-100 tracking-tight">
             {business?.name || 'Your Business'}
           </h1>

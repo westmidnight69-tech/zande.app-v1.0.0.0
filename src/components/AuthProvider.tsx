@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
-  const fetchBusiness = async (userId: string) => {
+  const fetchBusiness = async (userId: string, isSignInEvent: boolean = false) => {
     try {
       const { data, error } = await safeRequest(() => supabase
         .from('businesses')
@@ -92,6 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       
       if (!error && data) {
+        // If it's a fresh sign-in, increment the login count
+        if (isSignInEvent) {
+          const newCount = (data.login_count || 0) + 1;
+          await safeRequest(() => supabase
+            .from('businesses')
+            .update({ login_count: newCount })
+            .eq('id', data.id)
+          );
+          data.login_count = newCount;
+        }
         setBusiness(data);
       } else {
         setBusiness(null);
@@ -102,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleAuthUpdate = async (newSession: Session | null) => {
+  const handleAuthUpdate = async (newSession: Session | null, event?: string) => {
     // Drop concurrent calls — only one auth update should run at a time per tab
     if (isHandlingAuth.current) return;
     isHandlingAuth.current = true;
@@ -123,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (newSession?.user) {
         await Promise.all([
-          fetchBusiness(newSession.user.id),
+          fetchBusiness(newSession.user.id, event === 'SIGNED_IN'),
           syncSession(newSession.user.id)
         ]);
       } else {
@@ -188,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (initializationPromise.current) {
         await initializationPromise.current;
       }
-      handleAuthUpdate(newSession);
+      handleAuthUpdate(newSession, _event);
     });
 
     return () => {

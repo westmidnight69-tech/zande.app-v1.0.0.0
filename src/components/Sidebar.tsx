@@ -11,7 +11,6 @@ const navItems = [
   { name: 'Documents', path: '/documents', icon: 'folder' },
   { name: 'Reconciliation', path: '/reconciliation', icon: 'sync_alt' },
   { name: 'Bank Accounts', path: '/bank', icon: 'account_balance' },
-  { name: 'Funding', path: '/goals', icon: 'trending_up' },
   { name: 'Reports', path: '/reports', icon: 'bar_chart' },
   { name: 'Settings', path: '/settings', icon: 'settings' },
 ];

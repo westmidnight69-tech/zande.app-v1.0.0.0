@@ -12,7 +12,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Reconciliation from './pages/Reconciliation';
 import Catalogue from './pages/Catalogue';
-import FundingGoals from './pages/FundingGoals';
+import More from './pages/More';
 
 import { AuthProvider } from './components/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -40,11 +40,10 @@ function App() {
               <Route path="payments" element={<Payments />} />
               <Route path="bank" element={<BankAccounts />} />
               <Route path="documents" element={<Documents />} />
-              <Route path="goals" element={<FundingGoals />} />
               <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<Settings />} />
               <Route path="reconciliation" element={<Reconciliation />} />
-              <Route path="more" element={<div className="p-4">More (Coming Soon)</div>} />
+              <Route path="more" element={<More />} />
             </Route>
           </Route>
         </Routes>

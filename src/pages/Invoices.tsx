@@ -6,7 +6,7 @@ import { Input, Select, PrimaryButton, SecondaryButton } from '../components/For
 
 import { useAuth } from '../components/AuthProvider';
 import { logAuditAction } from '../lib/audit';
-import { MoreVertical, Share2, CheckCircle, Clock, FileEdit, XCircle } from 'lucide-react';
+import { MoreVertical, Share2, CheckCircle, Clock, FileEdit, XCircle, DownloadCloud, Eye } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import './Signup.css';
 
@@ -176,126 +176,196 @@ export default function Invoices() {
     setActiveMenuId(null);
   }
 
-  const handleShareWhatsApp = async (invoice: any) => {
-    if (!business?.id) return;
+  const generateAndStoreInvoicePDF = async (invoice: any) => {
+    if (!business?.id) return null;
+    
+    const doc = new jsPDF();
+    
+    // Professional Header
+    doc.setFillColor(31, 41, 55); // Dark Gray
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text(business?.name || 'INVOICE', 20, 25);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Invoice Number:', 150, 15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(invoice.invoice_number, 150, 22);
+    
+    // Client Information
+    doc.setTextColor(31, 41, 55);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILL TO:', 20, 55);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(invoice.client?.name || 'Valued Client', 20, 62);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE DATE:', 150, 48);
+    doc.setFont('helvetica', 'normal');
+    doc.text(new Date(invoice.issue_date || invoice.created_at).toLocaleDateString(), 150, 54);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('DUE DATE:', 150, 62);
+    doc.setFont('helvetica', 'normal');
+    doc.text(new Date(invoice.due_date).toLocaleDateString(), 150, 68);
+    
+    // Table Header
+    doc.setFillColor(243, 244, 246);
+    doc.rect(20, 75, 170, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Description', 25, 81);
+    doc.text('Qty', 120, 81);
+    doc.text('Rate', 145, 81);
+    doc.text('Total', 175, 81);
+    
+    // Items
+    let y = 92;
+    doc.setFont('helvetica', 'normal');
+    
+    // Fetch line items if they are not already in the invoice object
+    let lineItems = invoice.items;
+    if (!lineItems || lineItems.length === 0) {
+      const { data } = await supabase
+        .from('line_items')
+        .select('*')
+        .eq('invoice_id', invoice.id)
+        .order('sort_order');
+      lineItems = data || [];
+    }
+
+    lineItems.forEach((item: any) => {
+      doc.text(item.description, 25, y);
+      doc.text(item.quantity.toString(), 120, y);
+      doc.text(`R ${item.unit_price.toFixed(2)}`, 145, y);
+      doc.text(`R ${(item.quantity * item.unit_price).toFixed(2)}`, 175, y);
+      
+      // Line separator
+      doc.setDrawColor(229, 231, 235);
+      doc.line(20, y + 4, 190, y + 4);
+      y += 12;
+    });
+    
+    // Totals
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Subtotal:', 145, y);
+    doc.text(`R ${invoice.subtotal?.toFixed(2) || invoice.total.toFixed(2)}`, 175, y);
+    
+    y += 8;
+    doc.text('VAT (15%):', 145, y);
+    doc.text(`R ${invoice.vat_amount?.toFixed(2) || (invoice.total * 0.15).toFixed(2)}`, 175, y);
+
+    y += 8;
+    doc.text('Total Amount:', 145, y);
+    doc.setFontSize(14);
+    doc.setTextColor(31, 41, 55);
+    doc.text(`R ${invoice.total.toFixed(2)}`, 175, y);
+    
+    // Footer
+    doc.setFontSize(10);
+    doc.setTextColor(156, 163, 175);
+    doc.text('Thank you for your business!', 105, 280, { align: 'center' });
+
+    const pdfBlob = doc.output('blob');
+    const safeInvNum = invoice.invoice_number.replace(/[^a-zA-Z0-9-]/g, '');
+    const fileName = `${business.id}/invoices/${safeInvNum}_${Date.now()}.pdf`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(fileName, pdfBlob, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('receipts')
+      .getPublicUrl(fileName);
+
+    // Save metadata to documents table
+    await supabase.from('documents').insert([{
+      filename: fileName.split('/').pop(),
+      original_filename: `${invoice.invoice_number}.pdf`,
+      file_size: pdfBlob.size,
+      mime_type: 'application/pdf',
+      document_type: 'INVOICE_PDF',
+      storage_bucket: 'receipts',
+      storage_path: fileName,
+      public_url: publicUrl,
+      description: `Invoice ${invoice.invoice_number} for ${invoice.client?.name || 'Client'}`,
+      business_id: business.id,
+      uploaded_by: user?.id,
+      session_id: sessionId
+    }]);
+
+    return { doc, publicUrl, pdfBlob };
+  };
+
+  const handleDownloadPDF = async (invoice: any) => {
+    setIsProcessingId(invoice.id);
+    setActiveMenuId(null);
+    try {
+      const result = await generateAndStoreInvoicePDF(invoice);
+      if (result) {
+        result.doc.save(`${invoice.invoice_number}.pdf`);
+      }
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      alert('Failed to generate PDF: ' + err.message);
+    } finally {
+      setIsProcessingId(null);
+    }
+  };
+
+  const handleViewPDF = async (invoice: any) => {
+    setIsProcessingId(invoice.id);
+    setActiveMenuId(null);
+    try {
+      const result = await generateAndStoreInvoicePDF(invoice);
+      if (result) {
+        window.open(result.publicUrl, '_blank');
+      }
+    } catch (err: any) {
+      console.error('View failed:', err);
+      alert('Failed to generate PDF: ' + err.message);
+    } finally {
+      setIsProcessingId(null);
+    }
+  };
+
+  const handleShareInvoice = async (invoice: any) => {
     setIsProcessingId(invoice.id);
     setActiveMenuId(null);
     
     try {
-      const doc = new jsPDF();
+      const result = await generateAndStoreInvoicePDF(invoice);
+      if (!result) return;
       
-      // Professional Header
-      doc.setFillColor(31, 41, 55); // Dark Gray
-      doc.rect(0, 0, 210, 40, 'F');
+      const message = `Hi ${invoice.client?.name || ''}, here is your invoice (${invoice.invoice_number}) for R${invoice.total.toFixed(2)}. View or download the PDF here: ${result.publicUrl}`;
       
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.text(business?.name || 'INVOICE', 20, 25);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Invoice Number:', 150, 15);
-      doc.setFont('helvetica', 'bold');
-      doc.text(invoice.invoice_number, 150, 22);
-      
-      // Client Information
-      doc.setTextColor(31, 41, 55);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('BILL TO:', 20, 55);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text(invoice.client?.name || 'Valued Client', 20, 62);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('INVOICE DATE:', 150, 48);
-      doc.setFont('helvetica', 'normal');
-      doc.text(new Date(invoice.issue_date || invoice.created_at).toLocaleDateString(), 150, 54);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('DUE DATE:', 150, 62);
-      doc.setFont('helvetica', 'normal');
-      doc.text(new Date(invoice.due_date).toLocaleDateString(), 150, 68);
-      
-      // Table Header
-      doc.setFillColor(243, 244, 246);
-      doc.rect(20, 75, 170, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Description', 25, 81);
-      doc.text('Qty', 120, 81);
-      doc.text('Rate', 145, 81);
-      doc.text('Total', 175, 81);
-      
-      // Items
-      let y = 92;
-      doc.setFont('helvetica', 'normal');
-      
-      // Fetch line items if they are not already in the invoice object
-      let lineItems = invoice.items;
-      if (!lineItems || lineItems.length === 0) {
-        const { data } = await supabase
-          .from('line_items')
-          .select('*')
-          .eq('invoice_id', invoice.id)
-          .order('sort_order');
-        lineItems = data || [];
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Invoice ${invoice.invoice_number}`,
+            text: message,
+          });
+        } catch (e) {
+          console.log('Share API failed or user cancelled:', e);
+          // Fallback if they cancel, we don't necessarily open whatsapp without asking, but we'll try it
+        }
+      } else {
+        // Fallback for desktop Safari/Chrome if no share API
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
       }
-
-      lineItems.forEach((item: any) => {
-        doc.text(item.description, 25, y);
-        doc.text(item.quantity.toString(), 120, y);
-        doc.text(`R ${item.unit_price.toFixed(2)}`, 145, y);
-        doc.text(`R ${(item.quantity * item.unit_price).toFixed(2)}`, 175, y);
-        
-        // Line separator
-        doc.setDrawColor(229, 231, 235);
-        doc.line(20, y + 4, 190, y + 4);
-        y += 12;
-      });
-      
-      // Totals
-      y += 5;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Subtotal:', 145, y);
-      doc.text(`R ${invoice.subtotal?.toFixed(2) || invoice.total.toFixed(2)}`, 175, y);
-      
-      y += 8;
-      doc.text('VAT (15%):', 145, y);
-      doc.text(`R ${invoice.vat_amount?.toFixed(2) || (invoice.total * 0.15).toFixed(2)}`, 175, y);
-
-      y += 8;
-      doc.text('Total Amount:', 145, y);
-      doc.setFontSize(14);
-      doc.setTextColor(31, 41, 55);
-      doc.text(`R ${invoice.total.toFixed(2)}`, 175, y);
-      
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(156, 163, 175);
-      doc.text('Thank you for your business!', 105, 280, { align: 'center' });
-
-      const pdfBlob = doc.output('blob');
-      const safeInvNum = invoice.invoice_number.replace(/[^a-zA-Z0-9-]/g, '');
-      const fileName = `${business.id}/invoices/${safeInvNum}_${Date.now()}.pdf`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('receipts')
-        .upload(fileName, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: true
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('receipts')
-        .getPublicUrl(fileName);
-
-      const message = `Hi ${invoice.client?.name || ''}, here is your invoice (${invoice.invoice_number}) for R${invoice.total.toFixed(2)}. View or download the PDF here: ${publicUrl}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
       
     } catch (err: any) {
       console.error('Sharing failed:', err);
@@ -584,11 +654,25 @@ export default function Invoices() {
                       <div className="h-px bg-border-subtle" />
                       <div className="p-1">
                         <button 
-                          onClick={() => handleShareWhatsApp(invoice)}
+                          onClick={() => handleViewPDF(invoice)}
+                          className="w-full text-left flex items-center gap-2 px-3 py-2 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-lg transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View PDF
+                        </button>
+                        <button 
+                          onClick={() => handleDownloadPDF(invoice)}
+                          className="w-full text-left flex items-center gap-2 px-3 py-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-400/10 rounded-lg transition-colors"
+                        >
+                          <DownloadCloud className="w-4 h-4" />
+                          Download PDF
+                        </button>
+                        <button 
+                          onClick={() => handleShareInvoice(invoice)}
                           className="w-full text-left flex items-center gap-2 px-3 py-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
                         >
                           <Share2 className="w-4 h-4" />
-                          Share via WhatsApp
+                          Share Invoice
                         </button>
                       </div>
                     </div>

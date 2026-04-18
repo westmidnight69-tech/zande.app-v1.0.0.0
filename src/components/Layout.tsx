@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
+import SurveyPopup from './SurveyPopup';
+import TutorialPopup from './TutorialPopup';
 
 export default function Layout() {
   return (
@@ -14,6 +16,9 @@ export default function Layout() {
           <BottomNav />
         </div>
       </div>
+      
+      <SurveyPopup />
+      <TutorialPopup />
     </div>
   );
 }

@@ -76,19 +76,22 @@ export default function Reports() {
       // Fallback to empty data so the UI still renders with layman's terms instead of a blank screen
       setExecutiveSummary({
         period,
-        revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, invoice_count: 0 },
+        business_name: business.name || 'Your Business',
+        revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 },
         expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 },
-        cash_flow: { opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0 },
-        vat: { output_vat: 0, input_vat: 0, vat_payable: 0, period },
-        debtors: { current: 0, '31-60': 0, '61-90': 0, '90+': 0, total_outstanding: 0 },
         net_profit: 0,
+        margin_pct: 0,
+        cash_flow: { opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0, period },
+        vat: { output_vat: 0, input_vat: 0, vat_payable: 0, period },
+        debtors_total: 0,
+        invoice_count: 0,
         top_expense_categories: []
       });
-      setIncomeStatement({ revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, invoice_count: 0 }, expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 }, net_profit: 0, period });
+      setIncomeStatement({ period, gross_profit: 0, net_profit: 0, margin_pct: 0, revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 }, expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 } });
       setVatSummary({ output_vat: 0, input_vat: 0, vat_payable: 0, period });
       setCashFlow({ period, opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0 });
       setDebtors({ as_of_date: period.dateTo, lines: [], totals: { current: 0, '31-60': 0, '61-90': 0, '90+': 0, total_outstanding: 0 }});
-      setInvoiceSummary({ period, lines: [], totals: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 }, by_status: { DRAFT: { count: 0, total: 0 }, SENT: { count: 0, total: 0 }, VIEWED: { count: 0, total: 0 }, PARTIAL: { count: 0, total: 0 }, PAID: { count: 0, total: 0 }, OVERDUE: { count: 0, total: 0 } }});
+      setInvoiceSummary({ period, lines: [], totals: { total_invoiced: 0, total_outstanding: 0, total_paid: 0, invoice_count: 0, by_status: { DRAFT: 0, SENT: 0, VIEWED: 0, PARTIAL: 0, PAID: 0, OVERDUE: 0 } }});
       setExpenseReport({ period, lines: [], by_category: {}, totals: { total_gross: 0, total_vat: 0, total_net: 0, expense_count: 0 }});
     } finally {
       setLoading(false);

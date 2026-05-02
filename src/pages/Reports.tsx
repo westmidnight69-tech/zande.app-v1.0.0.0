@@ -133,29 +133,50 @@ export default function Reports() {
     }
   };
 
-  const setPeriodPreset = (preset: 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear') => {
+  const setPeriodPreset = (preset: string) => {
     const now = new Date();
+    const year = now.getFullYear();
     let from = new Date();
     let to = new Date();
 
     switch (preset) {
+      case 'allTime':
+        from = new Date(2000, 0, 1);
+        to = now;
+        break;
       case 'thisMonth':
-        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        from = new Date(year, now.getMonth(), 1);
         to = now;
         break;
       case 'lastMonth':
-        from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        to = new Date(now.getFullYear(), now.getMonth(), 0);
+        from = new Date(year, now.getMonth() - 1, 1);
+        to = new Date(year, now.getMonth(), 0);
         break;
       case 'thisQuarter':
         const quarter = Math.floor(now.getMonth() / 3);
-        from = new Date(now.getFullYear(), quarter * 3, 1);
+        from = new Date(year, quarter * 3, 1);
         to = now;
         break;
       case 'thisYear':
-        from = new Date(now.getFullYear(), 0, 1);
+        from = new Date(year, 0, 1);
         to = now;
         break;
+      // SARS Category A (Odd Months)
+      case 'sarsA1': from = new Date(year, 0, 1); to = new Date(year, 2, 0); break; // Jan-Feb
+      case 'sarsA2': from = new Date(year, 2, 1); to = new Date(year, 4, 0); break; // Mar-Apr
+      case 'sarsA3': from = new Date(year, 4, 1); to = new Date(year, 6, 0); break; // May-Jun
+      case 'sarsA4': from = new Date(year, 6, 1); to = new Date(year, 8, 0); break; // Jul-Aug
+      case 'sarsA5': from = new Date(year, 8, 1); to = new Date(year, 10, 0); break; // Sep-Oct
+      case 'sarsA6': from = new Date(year, 10, 1); to = new Date(year, 12, 0); break; // Nov-Dec
+      // SARS Category B (Even Months)
+      case 'sarsB1': from = new Date(year, 1, 1); to = new Date(year, 3, 0); break; // Feb-Mar
+      case 'sarsB2': from = new Date(year, 3, 1); to = new Date(year, 5, 0); break; // Apr-May
+      case 'sarsB3': from = new Date(year, 5, 1); to = new Date(year, 7, 0); break; // Jun-Jul
+      case 'sarsB4': from = new Date(year, 7, 1); to = new Date(year, 9, 0); break; // Aug-Sep
+      case 'sarsB5': from = new Date(year, 9, 1); to = new Date(year, 11, 0); break; // Oct-Nov
+      case 'sarsB6': from = new Date(year - 1, 11, 1); to = new Date(year, 1, 0); break; // Dec-Jan
+      default:
+        return; // do nothing if unrecognized
     }
 
     setPeriod({
@@ -186,21 +207,39 @@ export default function Reports() {
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           {/* Period Presets */}
-          <div className="flex items-center gap-1 bg-surface/30 p-1 rounded-xl border border-border-subtle">
-            {[
-              { id: 'thisMonth', label: 'MTD' },
-              { id: 'lastMonth', label: 'Last Month' },
-              { id: 'thisQuarter', label: 'QTD' },
-              { id: 'thisYear', label: 'YTD' }
-            ].map(preset => (
-              <button
-                key={preset.id}
-                onClick={() => setPeriodPreset(preset.id as any)}
-                className="px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold uppercase text-slate-500 hover:text-slate-200 hover:bg-surface transition-all"
-              >
-                {preset.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-1 bg-surface/30 px-2 py-1 rounded-xl border border-border-subtle">
+            <span className="text-[10px] font-mono text-slate-500 uppercase ml-2 hidden sm:block">Preset:</span>
+            <select
+              onChange={(e) => setPeriodPreset(e.target.value)}
+              className="bg-transparent border-none text-xs font-mono text-slate-300 focus:ring-0 py-1.5 px-2 cursor-pointer outline-none w-48"
+              defaultValue="thisMonth"
+            >
+              <optgroup label="Standard" className="bg-surface text-slate-500 font-bold text-xs">
+                <option value="thisMonth" className="text-slate-200 font-normal">MTD (This Month)</option>
+                <option value="lastMonth" className="text-slate-200 font-normal">Last Month</option>
+                <option value="thisQuarter" className="text-slate-200 font-normal">QTD (This Quarter)</option>
+                <option value="thisYear" className="text-slate-200 font-normal">YTD (This Year)</option>
+                <option value="allTime" className="text-slate-200 font-normal">All Time</option>
+              </optgroup>
+              
+              <optgroup label="SARS VAT (Cat A: Odd)" className="bg-surface text-slate-500 font-bold text-xs">
+                <option value="sarsA1" className="text-slate-200 font-normal">Period 1: Jan - Feb</option>
+                <option value="sarsA2" className="text-slate-200 font-normal">Period 2: Mar - Apr</option>
+                <option value="sarsA3" className="text-slate-200 font-normal">Period 3: May - Jun</option>
+                <option value="sarsA4" className="text-slate-200 font-normal">Period 4: Jul - Aug</option>
+                <option value="sarsA5" className="text-slate-200 font-normal">Period 5: Sep - Oct</option>
+                <option value="sarsA6" className="text-slate-200 font-normal">Period 6: Nov - Dec</option>
+              </optgroup>
+              
+              <optgroup label="SARS VAT (Cat B: Even)" className="bg-surface text-slate-500 font-bold text-xs">
+                <option value="sarsB1" className="text-slate-200 font-normal">Period 1: Feb - Mar</option>
+                <option value="sarsB2" className="text-slate-200 font-normal">Period 2: Apr - May</option>
+                <option value="sarsB3" className="text-slate-200 font-normal">Period 3: Jun - Jul</option>
+                <option value="sarsB4" className="text-slate-200 font-normal">Period 4: Aug - Sep</option>
+                <option value="sarsB5" className="text-slate-200 font-normal">Period 5: Oct - Nov</option>
+                <option value="sarsB6" className="text-slate-200 font-normal">Period 6: Dec - Jan</option>
+              </optgroup>
+            </select>
           </div>
 
           {/* Period Picker */}

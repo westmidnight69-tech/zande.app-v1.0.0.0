@@ -48,10 +48,12 @@ export default function Reports() {
   const [invoiceSummary, setInvoiceSummary] = useState<InvoiceSummaryResult | null>(null);
   const [expenseReport, setExpenseReport] = useState<ExpenseReportResult | null>(null);
   const [executiveSummary, setExecutiveSummary] = useState<ExecutiveSummaryResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchAccountingData = useCallback(async () => {
     if (!business?.id) return;
     setLoading(true);
+    setErrorMsg(null);
     
     try {
       const [is, vat, cf, debt, inv, exp, exec] = await Promise.all([
@@ -71,28 +73,30 @@ export default function Reports() {
       setInvoiceSummary(inv);
       setExpenseReport(exp);
       setExecutiveSummary(exec);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Accounting Engine Error:', error);
-      // Fallback to empty data so the UI still renders with layman's terms instead of a blank screen
+      setErrorMsg(error.message || 'Unknown database error');
+      
+      const fallbackPeriod = period;
       setExecutiveSummary({
-        period,
+        period: fallbackPeriod,
         business_name: business.name || 'Your Business',
         revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 },
         expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 },
         net_profit: 0,
         margin_pct: 0,
-        cash_flow: { opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0, period },
-        vat: { output_vat: 0, input_vat: 0, vat_payable: 0, period },
+        cash_flow: { opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0, period: fallbackPeriod },
+        vat: { output_vat: 0, input_vat: 0, vat_payable: 0, period: fallbackPeriod },
         debtors_total: 0,
         invoice_count: 0,
         top_expense_categories: []
       });
-      setIncomeStatement({ period, gross_profit: 0, net_profit: 0, margin_pct: 0, revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 }, expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 } });
-      setVatSummary({ output_vat: 0, input_vat: 0, vat_payable: 0, period });
-      setCashFlow({ period, opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0 });
-      setDebtors({ as_of_date: period.dateTo, lines: [], totals: { current: 0, '31-60': 0, '61-90': 0, '90+': 0, total_outstanding: 0 }});
-      setInvoiceSummary({ period, lines: [], totals: { total_invoiced: 0, total_outstanding: 0, total_paid: 0, invoice_count: 0, by_status: { DRAFT: 0, SENT: 0, VIEWED: 0, PARTIAL: 0, PAID: 0, OVERDUE: 0 } }});
-      setExpenseReport({ period, lines: [], by_category: {}, totals: { total_gross: 0, total_vat: 0, total_net: 0, expense_count: 0 }});
+      setIncomeStatement({ period: fallbackPeriod, gross_profit: 0, net_profit: 0, margin_pct: 0, revenue: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, invoice_count: 0 }, expenses: { total_excl_vat: 0, total_vat: 0, total_incl_vat: 0, by_category: {}, expense_count: 0 } });
+      setVatSummary({ output_vat: 0, input_vat: 0, vat_payable: 0, period: fallbackPeriod });
+      setCashFlow({ period: fallbackPeriod, opening_balance: 0, cash_in: 0, cash_out: 0, net_movement: 0, closing_balance: 0 });
+      setDebtors({ as_of_date: fallbackPeriod.dateTo, lines: [], totals: { current: 0, '31-60': 0, '61-90': 0, '90+': 0, total_outstanding: 0 }});
+      setInvoiceSummary({ period: fallbackPeriod, lines: [], totals: { total_invoiced: 0, total_outstanding: 0, total_paid: 0, invoice_count: 0, by_status: { DRAFT: 0, SENT: 0, VIEWED: 0, PARTIAL: 0, PAID: 0, OVERDUE: 0 } }});
+      setExpenseReport({ period: fallbackPeriod, lines: [], by_category: {}, totals: { total_gross: 0, total_vat: 0, total_net: 0, expense_count: 0 }});
     } finally {
       setLoading(false);
     }
@@ -266,6 +270,23 @@ export default function Reports() {
           </div>
         </div>
       </header>
+
+      {/* Status Indicators */}
+      {errorMsg && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
+          <XCircle className="w-5 h-5 flex-shrink-0" />
+          <p className="text-sm"><b>Sync Error:</b> {errorMsg}</p>
+        </div>
+      )}
+
+      {executiveSummary && executiveSummary.revenue.total_incl_vat === 0 && executiveSummary.expenses.total_incl_vat === 0 && !loading && !errorMsg && (
+        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3 text-blue-400">
+          <Clock className="w-5 h-5 flex-shrink-0" />
+          <p className="text-sm">
+            <b>No records found for this period.</b> Try changing the date filter or selecting <b>"All Time"</b> to see historical data.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-4 scrollbar-none">

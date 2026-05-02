@@ -29,14 +29,17 @@ async function getVATOutput(
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
-    .eq('business_id', businessId)
-    .not('status', 'in', '("DRAFT","VOID","CANCELLED")');
+    .eq('business_id', businessId);
 
   if (error) {
     throw new Error(`[VAT Output] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Filter in JS for maximum resilience to database enum differences
+  const rows = (data ?? []).filter(row => {
+    const status = (row.status || '').toUpperCase();
+    return !['DRAFT', 'VOID', 'CANCELLED', 'CANCELED'].includes(status);
+  });
   let output_vat = 0;
 
   for (const row of rows) {

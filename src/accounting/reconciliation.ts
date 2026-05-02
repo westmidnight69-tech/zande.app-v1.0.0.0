@@ -35,15 +35,20 @@ export async function reconcile(
   businessId: string
 ): Promise<ReconciliationResult> {
   // Fetch total of all valid (non-void/draft) invoices
-  const { data: invoiceData, error: invError } = await supabase
+  const { data: allInvoices, error: invError } = await supabase
     .from('invoices')
-    .select('total')
-    .eq('business_id', businessId)
-    .not('status', 'in', '("DRAFT","VOID","CANCELLED")');
+    .select('total, status')
+    .eq('business_id', businessId);
 
   if (invError) {
     throw new Error(`[Reconciliation] Invoices error: ${invError.message}`);
   }
+
+  // Filter in JS for maximum resilience to database enum differences
+  const invoiceData = (allInvoices ?? []).filter(inv => {
+    const status = (inv.status || '').toUpperCase();
+    return !['DRAFT', 'VOID', 'CANCELLED', 'CANCELED'].includes(status);
+  });
 
   // Fetch total of all payments received
   const { data: paymentData, error: payError } = await supabase

@@ -32,23 +32,20 @@ export async function getDebtorsAging(
   asOfDate: string
 ): Promise<DebtorsAgingResult> {
   // Fetch all outstanding invoices with client names
-  const { data: invoices, error: invError } = await supabase
+  const { data: allInvoices, error: invError } = await supabase
     .from('invoices')
-    .select(`
-      id,
-      invoice_number,
-      issue_date,
-      due_date,
-      total,
-      status,
-      clients ( name )
-    `)
-    .eq('business_id', businessId)
-    .not('status', 'in', '("DRAFT","VOID","CANCELLED")');
+    .select('*, clients(name)')
+    .eq('business_id', businessId);
 
   if (invError) {
     throw new Error(`[Debtors] Invoices DB error: ${invError.message}`);
   }
+
+  // Filter in JS for maximum resilience to database enum differences
+  const invoices = (allInvoices ?? []).filter(inv => {
+    const status = (inv.status || '').toUpperCase();
+    return !['DRAFT', 'VOID', 'CANCELLED', 'CANCELED'].includes(status);
+  });
 
   // Fetch all payments for this business (to calculate amounts applied per invoice)
   const { data: payments, error: payError } = await supabase

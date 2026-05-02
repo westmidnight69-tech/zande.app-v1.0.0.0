@@ -296,18 +296,29 @@ export default function Reports() {
         
         <div className="flex items-center gap-2">
           <button 
+            onClick={() => fetchAccountingData()}
+            disabled={loading}
+            className="px-3 py-2 rounded-xl bg-surface border border-border-subtle text-slate-300 hover:text-white transition-colors flex items-center gap-2 group"
+            title="Recalculate & Sync Data"
+          >
+            <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`}>
+              sync
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-widest hidden sm:inline">Sync</span>
+          </button>
+
+          <button 
             onClick={() => handleExport('excel')}
             className="px-3 py-2 rounded-xl bg-surface border border-border-subtle text-slate-300 hover:text-white transition-colors flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">table_view</span>
-            <span className="text-[10px] font-mono uppercase font-bold">XLSX</span>
           </button>
           <button 
             onClick={() => handleExport('pdf')}
-            className="px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-lg shadow-primary/20"
+            className="px-3 py-2 rounded-xl bg-primary border border-primary/50 text-white hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-lg shadow-primary/10"
+            title="Export to PDF"
           >
             <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-            <span className="text-[10px] font-mono uppercase font-bold">PDF</span>
           </button>
         </div>
       </div>

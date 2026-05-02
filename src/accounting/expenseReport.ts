@@ -29,7 +29,7 @@ export async function getExpenseReport(
 ): Promise<ExpenseReportResult> {
   const { data, error } = await supabase
     .from('expenses')
-    .select('id, expense_date, category, merchant, description, amount, vat_amount, net_amount')
+    .select('*')
     .eq('business_id', businessId)
     .gte('expense_date', period.dateFrom)
     .lte('expense_date', period.dateTo)

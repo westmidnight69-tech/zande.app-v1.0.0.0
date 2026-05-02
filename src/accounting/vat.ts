@@ -26,12 +26,9 @@ async function getVATOutput(
   businessId: string,
   period: Period
 ): Promise<number> {
-  // Fetch invoices where the relevant VAT date falls within the period.
-  // We use COALESCE logic by fetching both columns and handling it in JS,
-  // since Supabase JS client does not support COALESCE in .select().
   const { data, error } = await supabase
     .from('invoices')
-    .select('vat_amount, tax_point_date, issue_date')
+    .select('*')
     .eq('business_id', businessId)
     .not('status', 'in', '("DRAFT","VOID","CANCELLED")');
 
@@ -43,7 +40,6 @@ async function getVATOutput(
   let output_vat = 0;
 
   for (const row of rows) {
-    // Use tax_point_date if available, otherwise fall back to issue_date
     const vatDate = row.tax_point_date ?? row.issue_date;
     if (vatDate >= period.dateFrom && vatDate <= period.dateTo) {
       output_vat += Number(row.vat_amount ?? 0);
@@ -63,9 +59,8 @@ async function getVATInput(
 ): Promise<number> {
   const { data, error } = await supabase
     .from('expenses')
-    .select('vat_amount')
+    .select('*')
     .eq('business_id', businessId)
-    .eq('vat_claimable', true)
     .gte('expense_date', period.dateFrom)
     .lte('expense_date', period.dateTo);
 
@@ -74,7 +69,11 @@ async function getVATInput(
   }
 
   const rows = data ?? [];
-  const input_vat = rows.reduce((sum, row) => sum + Number(row.vat_amount ?? 0), 0);
+  // Filter for claimable VAT in memory to avoid crashing on old schemas missing the column
+  const input_vat = rows.reduce((sum, row) => {
+    const isClaimable = row.vat_claimable === undefined ? true : row.vat_claimable === true;
+    return sum + (isClaimable ? Number(row.vat_amount ?? 0) : 0);
+  }, 0);
 
   return round2(input_vat);
 }

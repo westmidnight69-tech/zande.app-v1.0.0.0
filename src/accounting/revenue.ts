@@ -29,7 +29,7 @@ export async function getRevenue(
 ): Promise<RevenueResult> {
   const { data, error } = await supabase
     .from('invoices')
-    .select('total, subtotal, vat_amount')
+    .select('*')
     .eq('business_id', businessId)
     .gte('issue_date', period.dateFrom)
     .lte('issue_date', period.dateTo)

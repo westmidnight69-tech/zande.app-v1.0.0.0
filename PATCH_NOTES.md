@@ -1,3 +1,12 @@
+# Patch Notes: Version 1.2.1 - Reports UI Vercel Build Fix
+
+### 🛠️ Infrastructure & Accuracy
+- **Vercel Build Fix**: Resolved deployment failures by installing missing `date-fns` dependency.
+- **TypeScript Compliance**: Added missing `desc` parameter type logic to `BucketKPI` ensuring safe component compilation.
+- **Independent Branching**: Release maintained on separate `v1.2.1-reports-ui-fix` branch to enable independent deployment viewing.
+
+---
+
 # Patch Notes: Version 1.2.0 - The "Deterministic Accounting" Update
 
 ### 🚀 New Features

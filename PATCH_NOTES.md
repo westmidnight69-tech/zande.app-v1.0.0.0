@@ -1,3 +1,24 @@
+# Patch Notes: Version 1.2.0 - The "Deterministic Accounting" Update
+
+### 🚀 New Features
+- **Accountant-Grade Engine**:
+  - **Deterministic Logic Layer**: Transitioned to a strict, rule-based accounting engine for 100% data accuracy.
+  - **7-Report Suite**: Added Executive Summary, Expense Report, and Invoice Summary to the existing P&L, Cash Flow, VAT, and Aged Debtors modules.
+  - **Integrated Export Suite**: High-fidelity PDF generation (jspdf-autotable) and raw Excel exports (SheetJS) for all 7 report types.
+- **Premium Reports UI**:
+  - **Intelligence Dashboard**: A data-dense financial command center featuring KPI cards and interactive charts.
+  - **Period Presets**: Instant filtering for MTD, Last Month, QTD, and YTD reporting periods.
+  - **Mobile Optimized**: Responsive tab bar with horizontal scrolling and mobile-first data tables.
+- **System Integrity**:
+  - **Real-time Reconciliation**: Added a ledger balance check to the Accounts page to ensure financial consistency.
+
+### 🛠️ Infrastructure & Accuracy
+- **Append-Only Ledger**: Implemented optimized Supabase schema for balanced accounting entries.
+- **Type-Safe Modules**: Standardized all accounting logic into pure, testable TypeScript functions.
+- **Performance**: Optimized data fetching with parallel processing and intelligent caching.
+
+---
+
 # Patch Notes: Version 1.1.0 - The "My Growth" Update
 
 ### 🚀 New Features

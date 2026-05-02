@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import { Input, Select, PrimaryButton, SecondaryButton } from '../components/FormInputs';
 import { useAuth } from '../components/AuthProvider';
 import { logAuditAction } from '../lib/audit';
+import { ledgerService } from '../lib/ledger';
 
 interface Expense {
   id: string;
@@ -163,6 +164,13 @@ export default function Expenses() {
         entity_id: expenseData.id,
         new_data: expenseData
       });
+
+      // 3. Post to Ledger
+      try {
+        await ledgerService.postExpense(business.id, expenseData);
+      } catch (ledgerError) {
+        console.error('Ledger posting failed:', ledgerError);
+      }
 
       fetchExpenses();
       setIsModalOpen(false);

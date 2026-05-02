@@ -123,16 +123,28 @@ export default function BankAccounts() {
         ))}
       </div>
 
-      {/* Connection Status */}
-      {!loading && accounts.length > 0 && (
-         <div className="mt-8 p-4 bg-surface/30 border border-dashed border-border-subtle rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface/50 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">Bank Feed Status: Active</p>
+      {/* Live Sync Feature State */}
+      <div className="mt-12 p-8 bg-surface-muted/50 border border-border-subtle rounded-3xl relative overflow-hidden">
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="px-2 py-1 rounded-md bg-primary text-black text-[9px] font-bold font-mono tracking-widest uppercase">
+              Coming Soon
             </div>
-            <span className="material-symbols-outlined text-slate-700 group-hover:text-primary transition-colors">sync</span>
-         </div>
-      )}
+            <h3 className="font-display text-xl font-bold text-white">Live Bank API Sync</h3>
+          </div>
+          <p className="text-slate-400 text-sm max-w-md leading-relaxed mb-6">
+            We're building direct integrations with major South African banks (FNB, Standard Bank, Capitec, Absa, Nedbank) to pull your transaction data automatically.
+          </p>
+          <div className="flex gap-4 opacity-50 grayscale">
+            {/* Mock bank logos/icons */}
+            <div className="size-10 rounded-xl bg-surface border border-border-subtle flex items-center justify-center font-bold text-xs">FNB</div>
+            <div className="size-10 rounded-xl bg-surface border border-border-subtle flex items-center justify-center font-bold text-xs">SB</div>
+            <div className="size-10 rounded-xl bg-surface border border-border-subtle flex items-center justify-center font-bold text-xs">CP</div>
+            <div className="size-10 rounded-xl bg-surface border border-border-subtle flex items-center justify-center font-bold text-xs">AB</div>
+          </div>
+        </div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-[100px] pointer-events-none" />
+      </div>
     </div>
   );
 }

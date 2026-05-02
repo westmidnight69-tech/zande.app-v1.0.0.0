@@ -6,6 +6,7 @@ import { Input, Select, PrimaryButton, SecondaryButton } from '../components/For
 
 import { useAuth } from '../components/AuthProvider';
 import { logAuditAction } from '../lib/audit';
+import { ledgerService } from '../lib/ledger';
 import { MoreVertical, Share2, CheckCircle, Clock, FileEdit, XCircle, DownloadCloud, Eye } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import './Signup.css';
@@ -156,6 +157,25 @@ export default function Invoices() {
       .eq('id', invoiceId);
       
     if (!error && business?.id) {
+      // 1. Post to Ledger if VOID
+      if (newStatus === 'VOID') {
+        try {
+          // Find the transaction ID for this invoice
+          const { data: tx } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('reference_type', 'invoice')
+            .eq('reference_id', invoiceId)
+            .single();
+          
+          if (tx) {
+            await ledgerService.reverseTransaction(tx.id, 'Invoice marked as VOID');
+          }
+        } catch (err) {
+          console.error('Ledger reversal failed:', err);
+        }
+      }
+
       // audit
       await logAuditAction({
         business_id: business.id,
@@ -466,6 +486,17 @@ export default function Invoices() {
     if (itemsError) {
       alert('Invoice created but items failed: ' + itemsError.message);
     } else {
+      // 3. Post to Ledger
+      try {
+        await ledgerService.postInvoice(business.id, {
+          ...invoiceData,
+          clients: isNewClient ? { name: newClientName } : clients.find(c => c.id === clientId)
+        });
+      } catch (ledgerError) {
+        console.error('Ledger posting failed:', ledgerError);
+        // We don't block the UI here, but we log it
+      }
+
       setIsModalOpen(false);
       fetchInvoices();
       // Reset

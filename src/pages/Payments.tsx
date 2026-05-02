@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import { Input, Select, PrimaryButton, SecondaryButton } from '../components/FormInputs';
 import { useAuth } from '../components/AuthProvider';
 import { logAuditAction } from '../lib/audit';
+import { ledgerService } from '../lib/ledger';
 
 interface Payment {
   id: string;
@@ -137,6 +138,16 @@ export default function Payments() {
           .eq('id', newPayment.invoice_id);
       }
       
+      // 3. Post to Ledger
+      try {
+        await ledgerService.postPaymentReceived(business.id, {
+          ...paymentData,
+          invoices: invoices.find(i => i.id === newPayment.invoice_id)
+        });
+      } catch (ledgerError) {
+        console.error('Ledger posting failed:', ledgerError);
+      }
+
       setIsModalOpen(false);
       fetchPayments();
       setNewPayment({

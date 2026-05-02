@@ -20,6 +20,7 @@ import {
   exportIncomeStatementPDF, exportVATReportPDF, exportCashFlowPDF, exportDebtorsAgingPDF,
   exportInvoiceSummaryPDF, exportExpenseReportPDF, exportExecutiveSummaryPDF
 } from '../reports/pdf';
+import { XCircle, Clock, RefreshCw, FileText, BarChart3, PieChart as PieIcon, Download, FileSpreadsheet } from 'lucide-react';
 import { 
   exportIncomeStatementXLSX, exportVATReportXLSX, exportCashFlowXLSX, exportDebtorsAgingXLSX,
   exportInvoiceSummaryXLSX, exportExpenseReportXLSX, exportExecutiveSummaryXLSX

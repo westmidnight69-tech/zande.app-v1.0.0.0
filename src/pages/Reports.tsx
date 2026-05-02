@@ -667,7 +667,7 @@ function KPI({ card }: { card: any }) {
   );
 }
 
-function BucketKPI({ label, value, warning, alert, critical, total }: any) {
+function BucketKPI({ label, value, warning, alert, critical, total, desc }: any) {
   const borderColor = 
     critical ? 'border-rose-500/30' : 
     alert ? 'border-orange-500/30' : 

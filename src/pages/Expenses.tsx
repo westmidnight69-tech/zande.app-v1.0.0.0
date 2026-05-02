@@ -187,9 +187,10 @@ export default function Expenses() {
     setIsSubmitting(false);
   }
 
+  const currentMonthStr = new Date().toISOString().slice(0, 7); // "YYYY-MM"
   const totalThisMonth = expenses
-    .filter(e => new Date(e.expense_date).getMonth() === new Date().getMonth())
-    .reduce((sum, e) => sum + Number(e.amount), 0);
+    .filter(e => e.expense_date?.startsWith(currentMonthStr))
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const fmt = (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
 

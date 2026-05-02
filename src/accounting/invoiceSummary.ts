@@ -28,27 +28,21 @@ export async function getInvoiceSummary(
 ): Promise<InvoiceSummaryResult> {
   const { data, error } = await supabase
     .from('invoices')
-    .select(`
-      id,
-      invoice_number,
-      issue_date,
-      due_date,
-      total,
-      amount_due,
-      status,
-      clients ( name )
-    `)
+    .select('*, clients(name)')
     .eq('business_id', businessId)
     .gte('issue_date', period.dateFrom)
     .lte('issue_date', period.dateTo)
-    .not('status', 'in', '("VOID","CANCELLED")')
     .order('issue_date', { ascending: false });
 
   if (error) {
     throw new Error(`[InvoiceSummary] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Filter in JS for maximum resilience to casing and nulls
+  const rows = (data ?? []).filter(row => {
+    const status = (row.status || '').toUpperCase();
+    return !['VOID', 'CANCELLED'].includes(status);
+  });
   const lines: InvoiceSummaryLine[] = [];
 
   let total_invoiced = 0;

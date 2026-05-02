@@ -45,11 +45,12 @@ export async function getExpenses(
   const by_category: Record<string, number> = {};
 
   for (const row of rows) {
-    const incl = Number(row.amount ?? 0);
+    const incl = Number(row.amount || 0);
     // Use stored vat_amount if available; otherwise 0
-    const vat = Number(row.vat_amount ?? 0);
-    const net = row.net_amount != null ? Number(row.net_amount) : incl - vat;
-    const category = row.category ?? 'OTHER';
+    const vat = Number(row.vat_amount || 0);
+    // net_amount fallback: if missing, assume amount is inclusive and subtract vat
+    const net = row.net_amount != null ? Number(row.net_amount) : (incl - vat);
+    const category = row.category || 'OTHER';
 
     total_incl_vat += incl;
     total_vat += vat;

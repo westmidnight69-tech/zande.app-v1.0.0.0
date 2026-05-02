@@ -32,21 +32,23 @@ export async function getRevenue(
     .select('*')
     .eq('business_id', businessId)
     .gte('issue_date', period.dateFrom)
-    .lte('issue_date', period.dateTo)
-    // Exclude statuses that should not contribute to revenue
-    .not('status', 'in', '("DRAFT","VOID","CANCELLED")');
+    .lte('issue_date', period.dateTo);
 
   if (error) {
     throw new Error(`[Revenue] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Filter in JS for maximum resilience to casing and nulls
+  const rows = (data ?? []).filter(row => {
+    const status = (row.status || 'SENT').toUpperCase();
+    return !['DRAFT', 'VOID', 'CANCELLED'].includes(status);
+  });
 
   let total_incl_vat = 0;
   let total_vat = 0;
 
   for (const row of rows) {
-    const incl = Number(row.total ?? 0);
+    const incl = Number(row.total || row.amount_due || 0);
     // vat_amount is stored on the invoice; if missing, derive from total - subtotal
     const vat = row.vat_amount != null
       ? Number(row.vat_amount)

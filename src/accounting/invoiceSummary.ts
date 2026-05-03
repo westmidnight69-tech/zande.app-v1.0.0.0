@@ -49,6 +49,7 @@ export async function getInvoiceSummary(
   let total_outstanding = 0;
   const by_status: Record<string, number> = {};
 
+  for (const row of rows) {
     const status = (row.status ?? 'UNKNOWN').toUpperCase();
     const isSettled = ['SETTLED', 'PAID'].includes(status);
     const total = Number(row.total ?? 0);

@@ -70,6 +70,7 @@ export async function getDebtorsAging(
   const today = new Date(asOfDate);
   const lines: DebtorLine[] = [];
 
+  for (const inv of invoices) {
     const status = (inv.status || '').toUpperCase();
     const isSettled = ['SETTLED', 'PAID'].includes(status);
     const invoiceTotal = Number(inv.total ?? 0);

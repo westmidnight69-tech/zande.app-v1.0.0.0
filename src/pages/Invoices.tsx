@@ -521,16 +521,16 @@ export default function Invoices() {
     }
   };
   const totalOutstanding = invoices
-    .filter(i => i.status !== 'PAID')
+    .filter(i => !['PAID', 'SETTLED', 'VOID'].includes(i.status))
     .reduce((sum, i) => sum + Number(i.amount_due), 0);
 
   const fmt = (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex items-center justify-between mb-8 overflow-hidden">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-6">
         <div>
-          <h1 className="font-display text-4xl font-bold text-slate-100 tracking-tight">Invoices</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Invoices</h1>
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-1">Billing & Revenue</p>
         </div>
         <div className="flex items-center gap-2">

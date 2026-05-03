@@ -196,9 +196,9 @@ export default function Expenses() {
 
   return (
     <div className="pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex items-center justify-between mb-8 overflow-hidden">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-6">
         <div>
-          <h1 className="font-display text-4xl font-bold text-slate-100 tracking-tight">Expenses</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Expenses</h1>
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-1">Spending & Procurement</p>
         </div>
         <div className="flex items-center gap-2">

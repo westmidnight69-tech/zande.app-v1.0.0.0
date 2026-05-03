@@ -204,19 +204,19 @@ export default function Reports() {
 
   return (
     <div className="pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-6">
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-6">
         <div>
-          <h1 className="font-display text-4xl font-bold text-slate-100 tracking-tight">Intelligence</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Intelligence</h1>
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-1">Deterministic Financial Reporting Suite</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
           {/* Period Presets */}
-          <div className="flex items-center gap-1 bg-surface/30 px-2 py-1 rounded-xl border border-border-subtle">
-            <span className="text-[10px] font-mono text-slate-500 uppercase ml-2 hidden sm:block">Preset:</span>
+          <div className="flex items-center gap-1 bg-surface/30 px-2 py-1 rounded-xl border border-border-subtle w-full sm:w-auto">
+            <span className="text-[10px] font-mono text-slate-500 uppercase ml-2 hidden lg:block">Preset:</span>
             <select
               onChange={(e) => setPeriodPreset(e.target.value)}
-              className="bg-transparent border-none text-xs font-mono text-slate-300 focus:ring-0 py-1.5 px-2 cursor-pointer outline-none w-48"
+              className="bg-transparent border-none text-xs font-mono text-slate-300 focus:ring-0 py-1.5 px-2 cursor-pointer outline-none flex-1 sm:w-48"
               defaultValue="thisMonth"
             >
               <optgroup label="Standard" className="bg-surface text-slate-500 font-bold text-xs">
@@ -248,24 +248,25 @@ export default function Reports() {
           </div>
 
           {/* Period Picker */}
-          <div className="flex items-center gap-2 bg-surface/50 p-2 rounded-2xl border border-border-subtle">
-            <div className="flex items-center gap-2 px-2">
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 bg-surface/50 p-2 rounded-2xl border border-border-subtle w-full sm:w-auto">
+            <div className="flex items-center justify-between xs:justify-start gap-2 px-2 py-1 xs:py-0">
                <span className="text-[10px] font-mono text-slate-500 uppercase">From</span>
                <input 
                  type="date" 
                  value={period.dateFrom}
                  onChange={(e) => setPeriod(prev => ({ ...prev, dateFrom: e.target.value }))}
-                 className="bg-transparent text-xs font-mono text-slate-300 border-none focus:ring-0 p-0"
+                 className="bg-transparent text-xs font-mono text-slate-300 border-none focus:ring-0 p-0 text-right xs:text-left"
                />
             </div>
-            <div className="w-px h-4 bg-slate-800" />
-            <div className="flex items-center gap-2 px-2">
+            <div className="hidden xs:block w-px h-4 bg-slate-800" />
+            <div className="xs:hidden h-px w-full bg-slate-800/50" />
+            <div className="flex items-center justify-between xs:justify-start gap-2 px-2 py-1 xs:py-0">
                <span className="text-[10px] font-mono text-slate-500 uppercase">To</span>
                <input 
                  type="date" 
                  value={period.dateTo}
                  onChange={(e) => setPeriod(prev => ({ ...prev, dateTo: e.target.value }))}
-                 className="bg-transparent text-xs font-mono text-slate-300 border-none focus:ring-0 p-0"
+                 className="bg-transparent text-xs font-mono text-slate-300 border-none focus:ring-0 p-0 text-right xs:text-left"
                />
             </div>
           </div>
@@ -290,7 +291,7 @@ export default function Reports() {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-4 scrollbar-none">
+      <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-4 scrollbar-hide no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {[
           { id: 'exec', label: 'Executive Summary', icon: 'dashboard' },
           { id: 'pnl', label: 'Income Statement', icon: 'payments' },
@@ -359,7 +360,10 @@ export default function Reports() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-surface border border-border-subtle p-8 rounded-3xl">
-                <h2 className="font-display text-xl font-bold text-slate-100 mb-6">Performance Snapshot</h2>
+               <div className="flex items-center justify-between mb-6">
+                 <h2 className="font-display text-xl font-bold text-slate-100">Performance Snapshot</h2>
+                 <div className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-mono font-bold uppercase">Cash Flow Proxy</div>
+               </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[
@@ -470,7 +474,10 @@ export default function Reports() {
         {activeTab === 'cash' && cashFlow && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-surface border border-border-subtle p-8 rounded-3xl">
-               <h2 className="font-display text-2xl font-bold text-slate-100 mb-6">Cash Flow Statement</h2>
+               <div className="flex items-center justify-between mb-6">
+                 <h2 className="font-display text-2xl font-bold text-slate-100">Cash Flow Statement</h2>
+                 <div className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-mono font-bold uppercase">Cash Basis (Bank Pending)</div>
+               </div>
                <div className="space-y-6">
                   <Row label="Opening Cash Balance" value={fmt(cashFlow.opening_balance)} muted desc="Money you had in the bank at the start of the period." />
                   <div className="h-px bg-slate-800" />
@@ -567,8 +574,8 @@ export default function Reports() {
                 </div>
              </div>
 
-             <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden">
-                <table className="w-full text-left border-collapse">
+             <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                    <thead>
                       <tr className="bg-surface-muted/50 border-b border-border-subtle">
                          <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Client</th>
@@ -619,8 +626,8 @@ export default function Reports() {
               <KPI card={{ label: 'Records', value: expenseReport.totals.expense_count.toString(), color: 'text-primary', desc: 'Total number of expense entries.' }} />
             </div>
 
-            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden">
-               <table className="w-full text-left border-collapse">
+            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+               <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                      <tr className="bg-surface-muted/50 border-b border-border-subtle">
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Merchant / Date</th>
@@ -698,8 +705,8 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden mt-6">
-               <table className="w-full text-left border-collapse">
+            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800 mt-6">
+               <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                      <tr className="bg-surface-muted/50 border-b border-border-subtle">
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Invoice / Client</th>

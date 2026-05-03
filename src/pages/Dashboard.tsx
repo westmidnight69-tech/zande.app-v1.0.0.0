@@ -59,10 +59,10 @@ export default function Dashboard() {
       setLoading(true);
       
       const now = new Date();
-      const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const lastOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
       
-      const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
       const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
 
       // Parallel fetch for consolidated data
@@ -95,7 +95,7 @@ export default function Dashboard() {
       const totalCollectedThis = sum(payments.filter(p => p.payment_date >= firstOfThisMonth), 'amount');
       const totalCollectedPrev = sum(payments.filter(p => p.payment_date >= firstOfLastMonth && p.payment_date <= lastOfLastMonth), 'amount');
 
-      const activeInvoices = allInvoices.filter(i => !['PAID', 'VOID', 'DRAFT'].includes(i.status));
+      const activeInvoices = allInvoices.filter(i => !['PAID', 'SETTLED', 'VOID', 'DRAFT'].includes(i.status));
       const totalOutstanding = sum(activeInvoices, 'amount_due');
       const overdueCount = activeInvoices.filter(i => i.status === 'OVERDUE').length;
       const draftsTotal = sum(allInvoices.filter(i => i.status === 'DRAFT'), 'total');
@@ -139,7 +139,7 @@ export default function Dashboard() {
           <Skeleton className="w-64 h-16" />
         ) : (
           <div className="flex flex-col">
-            <h1 className="font-display text-5xl sm:text-6xl font-bold tracking-tight text-white mb-4">
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-4">
               {fmt(stats?.totalOutstanding ?? 0)}
             </h1>
             <div className="flex gap-2">

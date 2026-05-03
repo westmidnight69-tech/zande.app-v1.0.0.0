@@ -49,10 +49,10 @@ export async function getInvoiceSummary(
   let total_outstanding = 0;
   const by_status: Record<string, number> = {};
 
-  for (const row of rows) {
+    const status = (row.status ?? 'UNKNOWN').toUpperCase();
+    const isSettled = ['SETTLED', 'PAID'].includes(status);
     const total = Number(row.total ?? 0);
-    const amountDue = Number(row.amount_due ?? 0);
-    const status = row.status ?? 'UNKNOWN';
+    const amountDue = isSettled ? 0 : Number(row.amount_due ?? 0);
     const clientName = (row.clients as any)?.name ?? 'Unknown Client';
 
     total_invoiced += total;

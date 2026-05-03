@@ -70,12 +70,13 @@ export async function getDebtorsAging(
   const today = new Date(asOfDate);
   const lines: DebtorLine[] = [];
 
-  for (const inv of invoices ?? []) {
+    const status = (inv.status || '').toUpperCase();
+    const isSettled = ['SETTLED', 'PAID'].includes(status);
     const invoiceTotal = Number(inv.total ?? 0);
     const applied = paymentsApplied[inv.id] ?? 0;
-    const outstanding = round2(invoiceTotal - applied);
+    const outstanding = isSettled ? 0 : round2(invoiceTotal - applied);
 
-    // Skip fully paid invoices
+    // Skip fully paid or settled invoices
     if (outstanding <= 0) continue;
 
     // Calculate days past due (positive = overdue, negative = not yet due)

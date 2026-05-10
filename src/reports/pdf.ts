@@ -41,6 +41,12 @@ function fmt(n: number): string {
 }
 
 function addHeader(doc: jsPDF, title: string, period: string, businessName?: string) {
+  // Full-page dark background
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...BRAND.darkBg);
+  doc.rect(0, 0, pw, ph, 'F');
+
   // Dark header bar
   doc.setFillColor(...BRAND.darkBg);
   doc.rect(0, 0, 297, 28, 'F'); // Safe for landscape too
@@ -89,6 +95,13 @@ function addDivider(doc: jsPDF, y: number, width = 196): void {
   doc.setDrawColor(30, 41, 59); // slate-800
   doc.setLineWidth(0.3);
   doc.line(14, y, width, y);
+}
+
+function addPageBackground(doc: jsPDF) {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...BRAND.darkBg);
+  doc.rect(0, 0, pw, ph, 'F');
 }
 
 function addRow(
@@ -166,7 +179,8 @@ export function exportIncomeStatementPDF(
         0: { font: 'helvetica' },
         1: { font: 'courier', halign: 'right' }
       },
-      margin: { left: 14, right: 14 }
+      margin: { left: 14, right: 14 },
+      didDrawPage: () => addPageBackground(doc)
     });
     y = (doc as any).lastAutoTable.finalY + 4;
   }
@@ -250,12 +264,15 @@ export function exportDebtorsAgingPDF(data: DebtorsAgingResult, businessName?: s
     theme: 'striped',
     headStyles: { fillColor: [22, 33, 55], textColor: [100, 116, 139], fontSize: 7, font: 'courier' },
     styles: { fontSize: 8, textColor: [200, 210, 220] },
+    bodyStyles: { fillColor: [15, 23, 42] },
+    alternateRowStyles: { fillColor: [22, 33, 55] },
     columnStyles: {
       3: { halign: 'right', font: 'courier' },
       4: { halign: 'right', font: 'courier' },
       5: { halign: 'right', font: 'courier', fontStyle: 'bold' },
       6: { halign: 'right', fontStyle: 'bold' }
     },
+    didDrawPage: () => addPageBackground(doc),
     didParseCell: function(data) {
       if (data.section === 'body' && data.column.index === 6) {
         const bucket = data.cell.raw as string;
@@ -348,11 +365,14 @@ export function exportExpenseReportPDF(data: ExpenseReportResult, businessName?:
     theme: 'striped',
     headStyles: { fillColor: [22, 33, 55], textColor: [100, 116, 139], fontSize: 7, font: 'courier' },
     styles: { fontSize: 7, textColor: [200, 210, 220] },
+    bodyStyles: { fillColor: [15, 23, 42] },
+    alternateRowStyles: { fillColor: [22, 33, 55] },
     columnStyles: {
       4: { halign: 'right', font: 'courier' },
       5: { halign: 'right', font: 'courier' },
       6: { halign: 'right', font: 'courier', fontStyle: 'bold' }
-    }
+    },
+    didDrawPage: () => addPageBackground(doc)
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
@@ -383,7 +403,8 @@ export function exportExpenseReportPDF(data: ExpenseReportResult, businessName?:
       2: { halign: 'right', font: 'courier' },
       3: { halign: 'right', font: 'courier' },
       4: { halign: 'right', font: 'courier', fontStyle: 'bold' }
-    }
+    },
+    didDrawPage: () => addPageBackground(doc)
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
@@ -421,11 +442,14 @@ export function exportInvoiceSummaryPDF(data: InvoiceSummaryResult, businessName
     theme: 'striped',
     headStyles: { fillColor: [22, 33, 55], textColor: [100, 116, 139], fontSize: 7, font: 'courier' },
     styles: { fontSize: 8, textColor: [200, 210, 220] },
+    bodyStyles: { fillColor: [15, 23, 42] },
+    alternateRowStyles: { fillColor: [22, 33, 55] },
     columnStyles: {
       4: { halign: 'right', font: 'courier' },
       5: { halign: 'right', font: 'courier' },
       6: { halign: 'right', font: 'courier', fontStyle: 'bold' }
     },
+    didDrawPage: () => addPageBackground(doc),
     didParseCell: function(data) {
       if (data.section === 'body' && data.column.index === 3) {
         const status = data.cell.raw as string;

@@ -32,6 +32,7 @@ interface InvoiceItem {
   quantity: number;
   unit_price: number;
   catalogue_item_id?: string;
+  type: 'Product' | 'Service';
 }
 
 interface CatalogueItem {
@@ -61,18 +62,22 @@ export default function Invoices() {
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
 
   // New Invoice State
+  const isVatRegistered = business?.is_vat_registered ?? false;
+  const invoicePrefix = business?.invoice_prefix || 'INV';
+  const paymentTermsDays = business?.payment_terms_days ?? 14;
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newInvoice, setNewInvoice] = useState({
     client_id: '',
     issue_date: new Date().toISOString().split('T')[0],
-    due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+    due_date: new Date(Date.now() + paymentTermsDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    invoice_number: `${invoicePrefix}-${Date.now().toString().slice(-6)}`,
     status: 'SENT'
   });
   const [isNewClient, setIsNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
-  const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unit_price: 0 }]);
+  const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }]);
 
   // Handlers declared before use
   const fetchClients = async () => {
@@ -276,23 +281,36 @@ export default function Invoices() {
     // Totals
     y += 5;
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const subtotalAmt = invoice.subtotal ?? invoice.total;
     doc.text('Subtotal:', 145, y);
-    doc.text(`R ${invoice.subtotal?.toFixed(2) || invoice.total.toFixed(2)}`, 175, y);
-    
-    y += 8;
-    doc.text('VAT (15%):', 145, y);
-    doc.text(`R ${invoice.vat_amount?.toFixed(2) || (invoice.total * 0.15).toFixed(2)}`, 175, y);
+    doc.text(`R ${Number(subtotalAmt).toFixed(2)}`, 175, y);
+
+    if (isVatRegistered) {
+      y += 8;
+      const vatAmt = invoice.vat_amount ?? (invoice.total - subtotalAmt);
+      doc.text('VAT (15%):', 145, y);
+      doc.text(`R ${Number(vatAmt).toFixed(2)}`, 175, y);
+    } else {
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(150, 150, 150);
+      doc.text('Not a VAT-registered vendor', 145, y);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont('helvetica', 'bold');
+    }
 
     y += 8;
     doc.text('Total Amount:', 145, y);
     doc.setFontSize(14);
     doc.setTextColor(31, 41, 55);
-    doc.text(`R ${invoice.total.toFixed(2)}`, 175, y);
+    doc.text(`R ${Number(invoice.total).toFixed(2)}`, 175, y);
     
     // Footer
     doc.setFontSize(10);
     doc.setTextColor(156, 163, 175);
-    doc.text('Thank you for your business!', 105, 280, { align: 'center' });
+    const footerNote = business?.invoice_footer_note || 'Thank you for your business.';
+    doc.text(footerNote, 105, 280, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
     const safeInvNum = invoice.invoice_number.replace(/[^a-zA-Z0-9-]/g, '');
@@ -427,7 +445,7 @@ export default function Invoices() {
     }
 
     const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    const vat = subtotal * 0.15;
+    const vat = isVatRegistered ? subtotal * 0.15 : 0;
     const total = subtotal + vat;
 
     // 1. Create Invoice
@@ -477,8 +495,8 @@ export default function Invoices() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         line_total: item.quantity * item.unit_price,
-        vat_rate: 15,
-        vat_amount: (item.quantity * item.unit_price) * 0.15,
+        vat_rate: isVatRegistered ? 15 : 0,
+        vat_amount: isVatRegistered ? (item.quantity * item.unit_price) * 0.15 : 0,
         sort_order: idx + 1,
         catalogue_item_id: item.catalogue_item_id
       })));
@@ -499,13 +517,12 @@ export default function Invoices() {
 
       setIsModalOpen(false);
       fetchInvoices();
-      // Reset
-      setItems([{ description: '', quantity: 1, unit_price: 0 }]);
+      setItems([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }]);
           setNewInvoice({
             client_id: '',
             issue_date: new Date().toISOString().split('T')[0],
-            due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+            due_date: new Date(Date.now() + paymentTermsDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            invoice_number: `${invoicePrefix}-${Date.now().toString().slice(-6)}`,
             status: 'SENT'
           });
         setIsNewClient(false);
@@ -513,8 +530,7 @@ export default function Invoices() {
       }
     setIsSubmitting(false);
   }
-
-  const addItem = () => setItems([...items, { description: '', quantity: 1, unit_price: 0 }]);
+  const addItem = () => setItems([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }, ...items]);
   const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
@@ -849,25 +865,61 @@ export default function Invoices() {
                 <button 
                   type="button"
                   onClick={addItem}
-                  className="text-primary text-[10px] font-mono font-bold uppercase tracking-widest flex items-center gap-1 hover:text-white transition-colors"
+                  className="bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-widest flex items-center gap-1 hover:bg-primary hover:text-white transition-all active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[14px]">add</span> Add Item
                 </button>
              </div>
              
-             <div className="space-y-3">
+             <div className="space-y-4">
                {items.map((item, idx) => (
-                 <div key={idx} className="bg-surface-muted border border-border-subtle p-4 rounded-xl space-y-3 relative group/item">
-                    {items.length > 1 && (
-                      <button 
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        className="absolute right-4 top-4 text-slate-700 hover:text-status-overdue transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
-                    )}
-                    <div className="space-y-3">
+                 <div key={idx} className="bg-surface-muted/50 border border-border-subtle p-5 rounded-2xl space-y-4 relative group/item">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex bg-surface p-1 rounded-xl border border-border-subtle w-full sm:w-auto sm:min-w-[220px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newItems = [...items];
+                            newItems[idx].type = 'Service';
+                            setItems(newItems);
+                          }}
+                          className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase rounded-lg transition-all ${
+                            item.type === 'Service' 
+                              ? 'bg-primary text-primary-foreground font-bold shadow-sm' 
+                              : 'text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          Service
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newItems = [...items];
+                            newItems[idx].type = 'Product';
+                            setItems(newItems);
+                          }}
+                          className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase rounded-lg transition-all ${
+                            item.type === 'Product' 
+                              ? 'bg-primary text-primary-foreground font-bold shadow-sm' 
+                              : 'text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          Product
+                        </button>
+                      </div>
+
+                      {items.length > 1 && (
+                        <button 
+                          onClick={() => removeItem(idx)}
+                          className="size-9 rounded-xl flex items-center justify-center bg-surface border border-border-subtle text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20 transition-all self-end sm:self-auto"
+                          title="Remove Item"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
                       <Select 
                         label="Choose from Catalogue (Optional)"
                         options={[
@@ -889,7 +941,7 @@ export default function Invoices() {
                       />
                       <Input 
                         label="Description"
-                        placeholder="Service or Product name"
+                        placeholder={`${item.type} name`}
                         value={item.description}
                         onChange={(e) => {
                           const newItems = [...items];
@@ -931,14 +983,21 @@ export default function Invoices() {
                 <span>Subtotal</span>
                 <span>{fmt(items.reduce((s, i) => s + (i.quantity * i.unit_price), 0))}</span>
              </div>
-             <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-                <span>VAT (15%)</span>
-                <span>{fmt(items.reduce((s, i) => s + (i.quantity * i.unit_price), 0) * 0.15)}</span>
-             </div>
+             {isVatRegistered ? (
+               <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                 <span>VAT (15%)</span>
+                 <span>{fmt(items.reduce((s, i) => s + (i.quantity * i.unit_price), 0) * 0.15)}</span>
+               </div>
+             ) : (
+               <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-600 uppercase tracking-widest">
+                 <span className="material-symbols-outlined text-[12px]">info</span>
+                 <span>VAT not applicable — not a VAT-registered vendor</span>
+               </div>
+             )}
              <div className="pt-3 border-t border-border-subtle flex justify-between items-center">
                 <span className="font-display text-xs font-bold text-white uppercase tracking-widest">Total Amount</span>
                 <span className="font-mono text-xl font-bold text-primary tracking-tight">
-                  {fmt(items.reduce((s, i) => s + (i.quantity * i.unit_price), 0) * 1.15)}
+                  {fmt(items.reduce((s, i) => s + (i.quantity * i.unit_price), 0) * (isVatRegistered ? 1.15 : 1))}
                 </span>
              </div>
           </section>

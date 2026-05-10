@@ -26,13 +26,12 @@ import type {
 
 const BRAND = {
   name: 'Zande',
-  primaryColor: [14, 165, 233] as [number, number, number],   // sky-500
+  primaryColor: [31, 41, 55] as [number, number, number],     // slate-800
   bg: [255, 255, 255] as [number, number, number],            // white
-  textDark: [15, 23, 42] as [number, number, number],         // slate-900
-  textMuted: [71, 85, 105] as [number, number, number],       // slate-600
+  textDark: [31, 41, 55] as [number, number, number],         // slate-800
   textLight: [255, 255, 255] as [number, number, number],     // white
-  headerBg: [15, 23, 42] as [number, number, number],         // slate-900
-  tableHeadBg: [241, 245, 249] as [number, number, number],   // slate-100
+  textMuted: [107, 114, 128] as [number, number, number],     // gray-500
+  tableHeadBg: [243, 244, 246] as [number, number, number],   // gray-100
   successColor: [5, 150, 105] as [number, number, number],    // emerald-600
   dangerColor: [220, 38, 38] as [number, number, number],     // red-600
 };
@@ -46,33 +45,26 @@ function fmt(n: number): string {
 function addHeader(doc: jsPDF, title: string, period: string, businessName?: string) {
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Dark header banner
-  doc.setFillColor(...BRAND.headerBg);
-  doc.rect(0, 0, pageWidth, 35, 'F');
+  // Header background
+  doc.setFillColor(...BRAND.primaryColor);
+  doc.rect(0, 0, pageWidth, 40, 'F');
 
-  // Business / Brand Name (Left)
+  // Brand name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
+  doc.setFontSize(24);
   doc.setTextColor(...BRAND.textLight);
-  doc.text((businessName || BRAND.name).toLowerCase(), 14, 22);
+  doc.text(businessName || BRAND.name, 14, 25);
 
-  // Report details (Right)
+  // Period
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(203, 213, 225); // slate-300
-  doc.text('REPORT TYPE:', pageWidth - 14, 14, { align: 'right' });
-  
+  doc.setFontSize(10);
+  doc.text('REPORT PERIOD:', pageWidth - 14, 18, { align: 'right' });
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...BRAND.textLight);
-  doc.text(title.toUpperCase(), pageWidth - 14, 18, { align: 'right' });
+  doc.text(period, pageWidth - 14, 24, { align: 'right' });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(203, 213, 225); // slate-300
-  doc.text('PERIOD:', pageWidth - 14, 26, { align: 'right' });
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...BRAND.textLight);
-  doc.text(period, pageWidth - 14, 30, { align: 'right' });
+  // Report title
+  doc.setFontSize(12);
+  doc.text(title.toUpperCase(), pageWidth - 14, 32, { align: 'right' });
 }
 
 function addFooter(doc: jsPDF) {
@@ -97,7 +89,9 @@ function addDivider(doc: jsPDF, y: number, width = 196): void {
   doc.line(14, y, width, y);
 }
 
-
+function addPageBackground(doc: jsPDF) {
+  // No background fill needed for light theme (default white)
+}
 
 function addRow(
   doc: jsPDF,
@@ -133,7 +127,7 @@ export function exportIncomeStatementPDF(
 
   addHeader(doc, 'Income Statement', period, businessName);
 
-  let y = 45;
+  let y = 50;
 
   // Revenue section
   doc.setFont('helvetica', 'bold');
@@ -212,7 +206,7 @@ export function exportVATReportPDF(data: VATResult, businessName?: string): void
 
   addHeader(doc, 'VAT Report (VAT201)', period, businessName);
 
-  let y = 45;
+  let y = 50;
 
   addRow(doc, y, 'Output VAT (Sales)', fmt(data.output_vat));
   y += 7;
@@ -252,11 +246,11 @@ export function exportDebtorsAgingPDF(data: DebtorsAgingResult, businessName?: s
   ]);
 
   autoTable(doc, {
-    startY: 45,
+    startY: 50,
     head: [['Invoice #', 'Client', 'Due Date', 'Total', 'Paid', 'Outstanding', 'Bucket']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 8, font: 'helvetica', fontStyle: 'bold' },
+    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 7, font: 'courier' },
     styles: { fontSize: 8, textColor: BRAND.textDark },
     bodyStyles: { fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -300,7 +294,7 @@ export function exportCashFlowPDF(data: CashFlowResult, businessName?: string): 
 
   addHeader(doc, 'Cash Flow Statement', period, businessName);
 
-  let y = 45;
+  let y = 50;
 
   addRow(doc, y, 'Opening Balance', fmt(data.opening_balance));
   y += 8;
@@ -339,7 +333,7 @@ export function exportExpenseReportPDF(data: ExpenseReportResult, businessName?:
 
   addHeader(doc, 'Expense Report', period, businessName);
 
-  let y = 45;
+  let y = 50;
 
   const tableData = data.lines.map(line => [
     line.expense_date,
@@ -356,7 +350,7 @@ export function exportExpenseReportPDF(data: ExpenseReportResult, businessName?:
     head: [['Date', 'Merchant', 'Category', 'Description', 'Net', 'VAT', 'Gross']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 8, font: 'helvetica', fontStyle: 'bold' },
+    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 7, font: 'courier' },
     styles: { fontSize: 7, textColor: BRAND.textDark },
     bodyStyles: { fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -388,7 +382,7 @@ export function exportExpenseReportPDF(data: ExpenseReportResult, businessName?:
     head: [['Category', 'Count', 'Net', 'VAT', 'Gross']],
     body: summaryData,
     theme: 'plain',
-    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 8, font: 'helvetica', fontStyle: 'bold' },
+    headStyles: { textColor: BRAND.textMuted, fontSize: 7, font: 'courier' },
     styles: { fontSize: 8, textColor: BRAND.textDark },
     columnStyles: {
       1: { halign: 'right' },
@@ -427,11 +421,11 @@ export function exportInvoiceSummaryPDF(data: InvoiceSummaryResult, businessName
   ]);
 
   autoTable(doc, {
-    startY: 45,
+    startY: 50,
     head: [['Invoice #', 'Client', 'Issue Date', 'Status', 'Total', 'Paid', 'Outstanding']],
     body: tableData,
     theme: 'striped',
-    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 8, font: 'helvetica', fontStyle: 'bold' },
+    headStyles: { fillColor: BRAND.tableHeadBg, textColor: BRAND.textDark, fontSize: 7, font: 'courier' },
     styles: { fontSize: 8, textColor: BRAND.textDark },
     bodyStyles: { fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -470,7 +464,7 @@ export function exportExecutiveSummaryPDF(data: ExecutiveSummaryResult): void {
 
   addHeader(doc, 'Executive Dashboard Summary', period, data.business_name);
 
-  let y = 45;
+  let y = 50;
 
   // Key Metrics Blocks
   doc.setFont('helvetica', 'bold');

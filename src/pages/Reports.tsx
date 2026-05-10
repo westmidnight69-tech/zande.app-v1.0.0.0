@@ -344,22 +344,22 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Report Content — Paper Style */}
-      <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 shadow-2xl shadow-black/50 space-y-10 animate-in fade-in zoom-in-95 duration-500 border border-white/10">
+      {/* Report Content — Dashboard Style */}
+      <div className="bg-surface border border-white/5 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl shadow-black/50 space-y-10 animate-in fade-in zoom-in-95 duration-500">
         {/* EXECUTIVE SUMMARY TAB */}
         {activeTab === 'exec' && executiveSummary && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPI card={{ label: 'Total Revenue', value: fmt(executiveSummary.revenue.total_excl_vat), color: 'text-slate-900', desc: 'Total sales value before tax.' }} />
-              <KPI card={{ label: 'Net Profit', value: fmt(executiveSummary.net_profit), color: executiveSummary.net_profit >= 0 ? 'text-emerald-600' : 'text-rose-600', desc: "What's left over after paying all expenses." }} />
+              <KPI card={{ label: 'Total Revenue', value: fmt(executiveSummary.revenue.total_excl_vat), color: 'text-slate-100', desc: 'Total sales value before tax.' }} />
+              <KPI card={{ label: 'Net Profit', value: fmt(executiveSummary.net_profit), color: executiveSummary.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400', desc: "What's left over after paying all expenses." }} />
               <KPI card={{ label: 'Bank Position', value: fmt(executiveSummary.cash_flow.closing_balance), color: 'text-primary', desc: 'Actual cash in your bank account.' }} />
-              <KPI card={{ label: 'VAT Liability', value: fmt(executiveSummary.vat.vat_payable), color: executiveSummary.vat.vat_payable >= 0 ? 'text-amber-600' : 'text-emerald-600', desc: 'Amount owed to SARS (or refund if negative).' }} />
+              <KPI card={{ label: 'VAT Liability', value: fmt(executiveSummary.vat.vat_payable), color: executiveSummary.vat.vat_payable >= 0 ? 'text-amber-400' : 'text-emerald-400', desc: 'Amount owed to SARS (or refund if negative).' }} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-slate-50 border border-slate-200 p-8 rounded-3xl">
+              <div className="lg:col-span-2 bg-surface/50 border border-white/5 p-8 rounded-3xl">
                <div className="flex items-center justify-between mb-6">
-                 <h2 className="font-display text-xl font-bold text-slate-900">Performance Snapshot</h2>
+                 <h2 className="font-display text-xl font-bold text-slate-100">Performance Snapshot</h2>
                  <div className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[9px] font-mono font-bold uppercase">Cash Flow Proxy</div>
                </div>
                 <div className="h-[300px]">
@@ -369,12 +369,12 @@ export default function Reports() {
                       { name: 'Expenses', val: executiveSummary.expenses.total_excl_vat, fill: '#f43f5e' },
                       { name: 'Profit', val: executiveSummary.net_profit, fill: '#10b981' }
                     ]}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `R${v/1000}k`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `R${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '12px' }}
-                        itemStyle={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }}
+                        itemStyle={{ color: '#f1f5f9', fontFamily: 'monospace', fontSize: '12px' }}
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -382,16 +382,16 @@ export default function Reports() {
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 p-8 rounded-3xl">
-                <h2 className="font-display text-xl font-bold text-slate-900 mb-6">Top Expenses</h2>
+              <div className="bg-surface/50 border border-white/5 p-8 rounded-3xl">
+                <h2 className="font-display text-xl font-bold text-slate-100 mb-6">Top Expenses</h2>
                 <div className="space-y-6">
                   {executiveSummary.top_expense_categories.map(([cat, amount]) => (
                     <div key={cat} className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">{cat.replace(/_/g, ' ')}</span>
-                        <span className="text-xs font-mono font-bold text-slate-900">{fmt(amount)}</span>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{cat.replace(/_/g, ' ')}</span>
+                        <span className="text-xs font-mono font-bold text-slate-100">{fmt(amount)}</span>
                       </div>
-                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-primary opacity-80" 
                           style={{ width: `${(amount / executiveSummary.expenses.total_excl_vat) * 100}%` }}
@@ -412,30 +412,30 @@ export default function Reports() {
         {activeTab === 'pnl' && incomeStatement && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPI card={{ label: 'Revenue (Net)', value: fmt(incomeStatement.revenue.total_excl_vat), color: 'text-slate-900', desc: 'Money earned from sales.' }} />
-              <KPI card={{ label: 'Expenses (Net)', value: fmt(incomeStatement.expenses.total_excl_vat), color: 'text-slate-500', desc: 'Money spent to run the business.' }} />
-              <KPI card={{ label: 'Net Profit', value: fmt(incomeStatement.net_profit), color: incomeStatement.net_profit >= 0 ? 'text-emerald-600' : 'text-rose-600', desc: 'Your actual earnings after costs.' }} />
+              <KPI card={{ label: 'Revenue (Net)', value: fmt(incomeStatement.revenue.total_excl_vat), color: 'text-slate-100', desc: 'Money earned from sales.' }} />
+              <KPI card={{ label: 'Expenses (Net)', value: fmt(incomeStatement.expenses.total_excl_vat), color: 'text-slate-400', desc: 'Money spent to run the business.' }} />
+              <KPI card={{ label: 'Net Profit', value: fmt(incomeStatement.net_profit), color: incomeStatement.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400', desc: 'Your actual earnings after costs.' }} />
               <KPI card={{ label: 'Margin', value: `${incomeStatement.margin_pct.toFixed(1)}%`, color: 'text-primary', desc: 'Percentage of revenue kept as profit.' }} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-slate-50 border border-slate-200 p-6 rounded-3xl">
-                <h2 className="font-display text-xl font-bold text-slate-900 mb-6">Profit & Loss Breakdown</h2>
+              <div className="lg:col-span-2 bg-surface/50 border border-white/5 p-6 rounded-3xl">
+                <h2 className="font-display text-xl font-bold text-slate-100 mb-6">Profit & Loss Breakdown</h2>
                 <div className="space-y-4">
                    <Row label="Total Revenue (Excl VAT)" value={fmt(incomeStatement.revenue.total_excl_vat)} />
                    <Row label="Output VAT Collected" value={fmt(incomeStatement.revenue.total_vat)} muted />
-                   <div className="h-px bg-slate-200 my-4" />
+                   <div className="h-px bg-white/5 my-4" />
                    <Row label="Total Operating Expenses" value={`(${fmt(incomeStatement.expenses.total_excl_vat)})`} />
                    {Object.entries(incomeStatement.expenses.by_category).map(([cat, val]) => (
                      <Row key={cat} label={cat.replace(/_/g, ' ')} value={fmt(val)} sub />
                    ))}
-                   <div className="h-px bg-slate-200 my-4" />
+                   <div className="h-px bg-white/5 my-4" />
                    <Row label="Net Profit" value={fmt(incomeStatement.net_profit)} bold highlight={incomeStatement.net_profit >= 0} />
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
-                 <h2 className="font-display text-xl font-bold text-slate-900 mb-2">Expense Mix</h2>
+              <div className="bg-surface/50 border border-white/5 p-6 rounded-3xl">
+                 <h2 className="font-display text-xl font-bold text-slate-100 mb-2">Expense Mix</h2>
                  <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-8">Net expense distribution</p>
                  <div className="h-[200px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -471,25 +471,25 @@ export default function Reports() {
         {/* CASH FLOW TAB */}
         {activeTab === 'cash' && cashFlow && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-slate-50 border border-slate-200 p-8 rounded-3xl">
+            <div className="bg-surface/50 border border-white/5 p-8 rounded-3xl">
                <div className="flex items-center justify-between mb-6">
-                 <h2 className="font-display text-2xl font-bold text-slate-900">Cash Flow Statement</h2>
-                 <div className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[9px] font-mono font-bold uppercase">Cash Basis (Bank Pending)</div>
+                 <h2 className="font-display text-2xl font-bold text-slate-100">Cash Flow Statement</h2>
+                 <div className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-mono font-bold uppercase">Cash Basis (Bank Pending)</div>
                </div>
                <div className="space-y-6">
                   <Row label="Opening Cash Balance" value={fmt(cashFlow.opening_balance)} muted desc="Money you had in the bank at the start of the period." />
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-white/5" />
                   <Row label="Cash Received (Client Payments)" value={fmt(cashFlow.cash_in)} highlight desc="Actual cash that landed in your bank account." />
                   <Row label="Cash Paid Out (Supplier/Expenses)" value={`(${fmt(cashFlow.cash_out)})`} desc="Actual cash that left your bank account." />
-                  <div className="h-px bg-slate-200" />
+                  <div className="h-px bg-white/5" />
                   <Row label="Net Cash Movement" value={fmt(cashFlow.net_movement)} bold highlight={cashFlow.net_movement >= 0} desc="Difference between cash in and cash out." />
                   <Row label="Closing Cash Balance" value={fmt(cashFlow.closing_balance)} bold desc="Money you have in the bank at the end of the period." />
                </div>
             </div>
             
-            <div className="bg-slate-50 border border-slate-200 p-8 rounded-3xl flex flex-col items-center justify-center text-center">
-               <h3 className="font-display text-xl font-bold text-slate-900 mb-6">Cash Movement Summary</h3>
-               <p className="text-[10px] font-mono text-slate-500 mb-4 max-w-xs">A visual representation of money entering versus leaving your business.</p>
+            <div className="bg-surface/50 border border-white/5 p-8 rounded-3xl flex flex-col items-center justify-center text-center">
+               <h3 className="font-display text-xl font-bold text-slate-100 mb-6">Cash Movement Summary</h3>
+               <p className="text-[10px] font-mono text-slate-400 mb-4 max-w-xs">A visual representation of money entering versus leaving your business.</p>
                <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[
@@ -497,10 +497,10 @@ export default function Reports() {
                       { name: 'Cash Out', val: cashFlow.cash_out, fill: '#f43f5e' },
                       { name: 'Net', val: Math.abs(cashFlow.net_movement), fill: cashFlow.net_movement >= 0 ? '#0ea5e9' : '#f59e0b' }
                     ]}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `R${v/1000}k`} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '12px' }} itemStyle={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '12px' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} tickFormatter={(v) => `R${v/1000}k`} />
+                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }} itemStyle={{ color: '#f1f5f9', fontFamily: 'monospace', fontSize: '12px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -511,29 +511,29 @@ export default function Reports() {
 
         {/* VAT REPORT TAB */}
         {activeTab === 'vat' && vatSummary && (
-          <div className="max-w-2xl mx-auto bg-slate-50 border border-slate-200 p-8 rounded-3xl">
+          <div className="max-w-2xl mx-auto bg-surface/50 border border-white/5 p-8 rounded-3xl">
              <div className="flex items-center justify-between mb-8">
-               <h2 className="font-display text-2xl font-bold text-slate-900">SARS VAT201 Report</h2>
-               <div className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] font-mono font-bold uppercase">Compliance Ready</div>
+               <h2 className="font-display text-2xl font-bold text-slate-100">SARS VAT201 Report</h2>
+               <div className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] font-mono font-bold uppercase">Compliance Ready</div>
              </div>
              
              <div className="space-y-6">
                 <Row label="Output VAT (Sales Invoices)" value={fmt(vatSummary.output_vat)} desc="VAT you charged to your customers on sales. You owe this to SARS." />
                 <Row label="Input VAT (Claimable Expenses)" value={`(${fmt(vatSummary.input_vat)})`} desc="VAT you paid on business expenses. You claim this back from SARS." />
-                <div className="h-px bg-slate-200" />
-                <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between mt-6">
+                <div className="h-px bg-white/5" />
+                <div className="p-6 rounded-2xl bg-slate-900/50 border border-white/10 shadow-sm flex items-center justify-between mt-6">
                    <div>
-                      <p className="text-[10px] font-mono text-slate-500 uppercase font-bold mb-1">
+                      <p className="text-[10px] font-mono text-slate-400 uppercase font-bold mb-1">
                         {vatSummary.vat_payable >= 0 ? 'Net VAT Payable' : 'Net VAT Refund Due'}
                       </p>
                       <p className="text-[10px] text-slate-500 mb-2 max-w-xs leading-tight">
                         {vatSummary.vat_payable >= 0 ? 'Difference between what you owe and what you can claim. Pay this amount to SARS.' : 'Difference between what you owe and what you can claim. SARS owes you this amount.'}
                       </p>
-                      <h3 className={`font-mono text-3xl font-bold ${vatSummary.vat_payable >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <h3 className={`font-mono text-3xl font-bold ${vatSummary.vat_payable >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                         {fmt(Math.abs(vatSummary.vat_payable))}
                       </h3>
                    </div>
-                   <span className="material-symbols-outlined text-4xl text-slate-700 opacity-50">receipt_long</span>
+                   <span className="material-symbols-outlined text-4xl text-slate-600 opacity-50">receipt_long</span>
                 </div>
              </div>
           </div>
@@ -618,34 +618,34 @@ export default function Reports() {
         {activeTab === 'expenses' && expenseReport && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPI card={{ label: 'Total Gross', value: fmt(expenseReport.totals.total_gross), color: 'text-slate-900', desc: 'Total expenses including VAT.' }} />
-              <KPI card={{ label: 'Total VAT', value: fmt(expenseReport.totals.total_vat), color: 'text-amber-600', desc: 'VAT paid on these expenses.' }} />
-              <KPI card={{ label: 'Total Net', value: fmt(expenseReport.totals.total_net), color: 'text-slate-500', desc: 'Actual business cost (excluding VAT).' }} />
+              <KPI card={{ label: 'Total Gross', value: fmt(expenseReport.totals.total_gross), color: 'text-slate-100', desc: 'Total expenses including VAT.' }} />
+              <KPI card={{ label: 'Total VAT', value: fmt(expenseReport.totals.total_vat), color: 'text-amber-400', desc: 'VAT paid on these expenses.' }} />
+              <KPI card={{ label: 'Total Net', value: fmt(expenseReport.totals.total_net), color: 'text-slate-400', desc: 'Actual business cost (excluding VAT).' }} />
               <KPI card={{ label: 'Records', value: expenseReport.totals.expense_count.toString(), color: 'text-primary', desc: 'Total number of expense entries.' }} />
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
                <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
-                     <tr className="bg-slate-50 border-b border-slate-200">
+                     <tr className="bg-surface-muted/50 border-b border-border-subtle">
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Merchant / Date</th>
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Category</th>
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-right">Gross Amount</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-800">
                      {expenseReport.lines.map(line => (
-                       <tr key={line.expense_id} className="hover:bg-slate-50 transition-colors">
+                       <tr key={line.expense_id} className="hover:bg-surface-muted/30 transition-colors">
                           <td className="px-6 py-4">
-                             <p className="text-sm font-bold text-slate-900">{line.merchant}</p>
+                             <p className="text-sm font-bold text-slate-200">{line.merchant}</p>
                              <p className="text-[10px] font-mono text-slate-500">{line.expense_date}</p>
                           </td>
                           <td className="px-6 py-4">
-                             <span className="px-2 py-1 rounded bg-slate-100 text-[9px] font-mono font-bold uppercase text-slate-500">
+                             <span className="px-2 py-1 rounded bg-surface-muted text-[9px] font-mono font-bold uppercase text-slate-400">
                                 {line.category.replace(/_/g, ' ')}
                              </span>
                           </td>
-                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-slate-900">
+                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-slate-100">
                              {fmt(line.amount)}
                           </td>
                        </tr>
@@ -665,15 +665,15 @@ export default function Reports() {
         {activeTab === 'invoices' && invoiceSummary && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPI card={{ label: 'Total Invoiced', value: fmt(invoiceSummary.totals.total_invoiced), color: 'text-slate-900', desc: 'Total value of all invoices issued.' }} />
-              <KPI card={{ label: 'Outstanding', value: fmt(invoiceSummary.totals.total_outstanding), color: 'text-rose-600', desc: 'Amount still waiting to be paid.' }} />
-              <KPI card={{ label: 'Paid', value: fmt(invoiceSummary.totals.total_paid), color: 'text-emerald-600', desc: 'Amount successfully collected.' }} />
+              <KPI card={{ label: 'Total Invoiced', value: fmt(invoiceSummary.totals.total_invoiced), color: 'text-slate-100', desc: 'Total value of all invoices issued.' }} />
+              <KPI card={{ label: 'Outstanding', value: fmt(invoiceSummary.totals.total_outstanding), color: 'text-rose-400', desc: 'Amount still waiting to be paid.' }} />
+              <KPI card={{ label: 'Paid', value: fmt(invoiceSummary.totals.total_paid), color: 'text-emerald-400', desc: 'Amount successfully collected.' }} />
               <KPI card={{ label: 'Count', value: invoiceSummary.totals.invoice_count.toString(), color: 'text-primary', desc: 'Number of invoices issued.' }} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
-                   <h3 className="font-display text-lg font-bold text-slate-900 mb-4">Invoice Status Mix</h3>
+                <div className="bg-surface/50 border border-white/5 p-6 rounded-3xl">
+                   <h3 className="font-display text-lg font-bold text-slate-100 mb-4">Invoice Status Mix</h3>
                    <div className="h-[200px] w-full">
                      <ResponsiveContainer width="100%" height="100%">
                        <PieChart>
@@ -696,28 +696,28 @@ export default function Reports() {
                              <span className="size-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                              <span className="text-[9px] font-mono text-slate-500 uppercase">{name}</span>
                           </div>
-                          <span className="text-[9px] font-mono text-slate-900 font-bold">{value}</span>
+                          <span className="text-[9px] font-mono text-slate-100 font-bold">{value}</span>
                        </div>
                      ))}
                    </div>
                 </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 mt-6">
+            <div className="bg-surface border border-border-subtle rounded-3xl overflow-hidden overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800 mt-6">
                <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
-                     <tr className="bg-slate-50 border-b border-slate-200">
+                     <tr className="bg-surface-muted/50 border-b border-border-subtle">
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Invoice / Client</th>
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-center">Status</th>
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-right">Outstanding</th>
                         <th className="px-6 py-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-right">Total</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-800">
                      {invoiceSummary.lines.map(line => (
-                       <tr key={line.invoice_id} className="hover:bg-slate-50 transition-colors">
+                       <tr key={line.invoice_id} className="hover:bg-surface-muted/30 transition-colors">
                           <td className="px-6 py-4">
-                             <p className="text-sm font-bold text-slate-900">{line.invoice_number}</p>
+                             <p className="text-sm font-bold text-slate-200">{line.invoice_number}</p>
                              <p className="text-[10px] font-mono text-slate-500">{line.client_name}</p>
                           </td>
                           <td className="px-6 py-4 text-center">
@@ -729,10 +729,10 @@ export default function Reports() {
                                 {line.status}
                              </span>
                           </td>
-                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-rose-600">
+                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-rose-400">
                              {line.amount_due > 0 ? fmt(line.amount_due) : '—'}
                           </td>
-                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-slate-900">
+                          <td className="px-6 py-4 text-right font-mono text-sm font-bold text-slate-200">
                              {fmt(line.total)}
                           </td>
                        </tr>
@@ -751,9 +751,9 @@ export default function Reports() {
 
 function KPI({ card }: { card: any }) {
   return (
-    <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all">
+    <div className="bg-surface border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all">
        <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-bold mb-2">{card.label}</p>
-       <h3 className={`font-mono text-lg font-bold tracking-tight ${card.color}`}>
+       <h3 className={`font-mono text-lg font-bold tracking-tight ${card.color.includes('text-slate-900') ? 'text-slate-100' : card.color}`}>
           {card.value}
        </h3>
        {card.desc && (
@@ -769,19 +769,19 @@ function BucketKPI({ label, value, warning, alert, critical, total, desc }: any)
     critical ? 'border-rose-500/30' : 
     alert ? 'border-orange-500/30' : 
     warning ? 'border-amber-500/30' : 
-    total ? 'border-primary/30' : 'border-slate-200';
+    total ? 'border-primary/30' : 'border-white/5';
   
   const textColor = 
-    critical ? 'text-rose-600' : 
-    alert ? 'text-orange-600' : 
-    warning ? 'text-amber-600' : 
-    total ? 'text-primary' : 'text-slate-900';
+    critical ? 'text-rose-400' : 
+    alert ? 'text-orange-400' : 
+    warning ? 'text-amber-400' : 
+    total ? 'text-primary' : 'text-slate-100';
 
   const bgColor = 
-    critical ? 'bg-rose-50' : 
-    alert ? 'bg-orange-50' : 
-    warning ? 'bg-amber-50' : 
-    total ? 'bg-primary/5' : 'bg-slate-50';
+    critical ? 'bg-rose-500/5' : 
+    alert ? 'bg-orange-500/5' : 
+    warning ? 'bg-amber-500/5' : 
+    total ? 'bg-primary/5' : 'bg-surface';
 
   return (
     <div className={`${bgColor} border ${borderColor} p-4 rounded-2xl flex flex-col justify-between h-full shadow-sm`}>
@@ -797,12 +797,12 @@ function Row({ label, value, sub, bold, muted, highlight, desc }: any) {
   return (
     <div className={`flex items-start justify-between ${sub ? 'pl-4' : ''}`}>
        <div>
-         <span className={`text-[11px] uppercase tracking-wider font-mono block ${muted ? 'text-slate-500' : 'text-slate-500'} ${bold ? 'font-bold text-slate-900' : ''}`}>
+         <span className={`text-[11px] uppercase tracking-wider font-mono block ${muted ? 'text-slate-600' : 'text-slate-400'} ${bold ? 'font-bold text-slate-200' : ''}`}>
             {label}
          </span>
          {desc && <span className="text-[9px] text-slate-500 block mt-0.5">{desc}</span>}
        </div>
-       <span className={`font-mono text-sm ${bold ? 'font-bold text-slate-900' : 'text-slate-600'} ${highlight ? 'text-emerald-600' : ''}`}>
+       <span className={`font-mono text-sm ${bold ? 'font-bold text-slate-100' : 'text-slate-300'} ${highlight ? 'text-emerald-400' : ''}`}>
           {value}
        </span>
     </div>

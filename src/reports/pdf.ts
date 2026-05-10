@@ -89,9 +89,6 @@ function addDivider(doc: jsPDF, y: number, width = 196): void {
   doc.line(14, y, width, y);
 }
 
-function addPageBackground(doc: jsPDF) {
-  // No background fill needed for light theme (default white)
-}
 
 function addRow(
   doc: jsPDF,

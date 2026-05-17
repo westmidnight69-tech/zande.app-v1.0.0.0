@@ -33,13 +33,15 @@ export async function getExpenseReport(
     .eq('business_id', businessId)
     .gte('expense_date', period.dateFrom)
     .lte('expense_date', period.dateTo)
+    .neq('is_void', true)
     .order('expense_date', { ascending: false });
 
   if (error) {
     throw new Error(`[ExpenseReport] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Defensive: also filter in JS in case DB column is missing on older schemas
+  const rows = (data ?? []).filter(row => row.is_void !== true);
   const lines: ExpenseReportLine[] = [];
 
   const by_category: Record<string, { net: number; vat: number; gross: number; count: number }> = {};

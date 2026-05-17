@@ -65,13 +65,15 @@ async function getVATInput(
     .select('*')
     .eq('business_id', businessId)
     .gte('expense_date', period.dateFrom)
-    .lte('expense_date', period.dateTo);
+    .lte('expense_date', period.dateTo)
+    .neq('is_void', true);
 
   if (error) {
     throw new Error(`[VAT Input] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Defensive: filter voided in JS too
+  const rows = (data ?? []).filter(row => row.is_void !== true);
   // Filter for claimable VAT in memory to avoid crashing on old schemas missing the column
   const input_vat = rows.reduce((sum, row) => {
     const isClaimable = row.vat_claimable === undefined ? true : row.vat_claimable === true;

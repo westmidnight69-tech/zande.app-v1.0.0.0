@@ -17,6 +17,9 @@ interface Expense {
   payment_method: string | null;
   reference: string | null;
   receipt_url: string | null;
+  is_void?: boolean;
+  voided_at?: string | null;
+  void_reason?: string | null;
 }
 
 // Default built-in categories (from the DB enum)
@@ -348,9 +351,35 @@ export default function Expenses() {
     setIsSubmitting(false);
   }
 
+  async function handleVoidExpense(expenseId: string) {
+    if (!business?.id) return;
+    if (!confirm('Are you sure you want to void this expense? It will be treated as R0.00 in all reports.')) return;
+
+    const { error } = await supabase
+      .from('expenses')
+      .update({ is_void: true, voided_at: new Date().toISOString() })
+      .eq('id', expenseId)
+      .eq('business_id', business.id);
+
+    if (error) {
+      alert('Failed to void expense: ' + error.message);
+    } else {
+      await logAuditAction({
+        business_id: business.id,
+        user_id: user?.id || '',
+        session_id: sessionId,
+        action: 'VOID',
+        entity_type: 'EXPENSE',
+        entity_id: expenseId,
+        new_data: { is_void: true }
+      });
+      fetchExpenses();
+    }
+  }
+
   const currentMonthStr = new Date().toISOString().slice(0, 7); // "YYYY-MM"
   const totalThisMonth = expenses
-    .filter(e => e.expense_date?.startsWith(currentMonthStr))
+    .filter(e => e.expense_date?.startsWith(currentMonthStr) && !e.is_void)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const fmt = (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
@@ -457,19 +486,35 @@ export default function Expenses() {
         )}
 
         {!loading && !error && paginatedExpenses.map(expense => (
-          <div key={expense.id} className="bg-surface border border-border-subtle p-4 rounded-xl hover:bg-surface-muted transition-all cursor-pointer group">
+          <div key={expense.id} className={`bg-surface border p-4 rounded-xl transition-all group ${
+            expense.is_void 
+              ? 'border-status-overdue/20 opacity-60' 
+              : 'border-border-subtle hover:bg-surface-muted cursor-pointer'
+          }`}>
             <div className="flex items-center gap-4">
-              <div className="size-11 rounded-lg bg-surface-muted border border-border-subtle flex items-center justify-center flex-shrink-0 text-slate-600 group-hover:text-status-expenses transition-colors">
+              <div className={`size-11 rounded-lg border flex items-center justify-center flex-shrink-0 transition-colors ${
+                expense.is_void
+                  ? 'bg-status-overdue/10 border-status-overdue/20 text-status-overdue'
+                  : 'bg-surface-muted border-border-subtle text-slate-600 group-hover:text-status-expenses'
+              }`}>
                 <span className="material-symbols-outlined">
-                  {expense.category === 'TRAVEL' ? 'flight' : 
+                  {expense.is_void ? 'block' :
+                   expense.category === 'TRAVEL' ? 'flight' : 
                    expense.category === 'MEALS' ? 'restaurant' :
                    expense.category === 'SUBSCRIPTIONS' ? 'rebase' : 'payments'}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-100 truncate group-hover:text-white">
-                  {expense.supplier || expense.description}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-semibold text-sm truncate ${expense.is_void ? 'text-slate-500 line-through' : 'text-slate-100 group-hover:text-white'}`}>
+                    {expense.supplier || expense.description}
+                  </h3>
+                  {expense.is_void && (
+                    <span className="px-2 py-0.5 rounded-full text-[8px] font-mono font-bold uppercase tracking-widest bg-status-overdue/15 text-status-overdue border border-status-overdue/20 flex-shrink-0">
+                      Void
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest truncate">
                     {new Date(expense.expense_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
@@ -480,18 +525,31 @@ export default function Expenses() {
                   </p>
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="font-mono text-sm font-bold text-white tracking-tight">{fmt(expense.amount)}</p>
-                <div className="flex items-center justify-end gap-1 mt-1">
-                   {expense.receipt_url ? (
-                     <a href={expense.receipt_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-500 hover:text-emerald-400 transition-colors">
+              <div className="text-right flex-shrink-0 flex items-center gap-3">
+                <div>
+                  <p className={`font-mono text-sm font-bold tracking-tight ${expense.is_void ? 'text-slate-600 line-through' : 'text-white'}`}>
+                    {fmt(expense.amount)}
+                  </p>
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    {expense.receipt_url ? (
+                      <a href={expense.receipt_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-500 hover:text-emerald-400 transition-colors">
                         <span className="material-symbols-outlined text-[14px]">visibility</span>
                         <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Receipt</span>
-                     </a>
-                   ) : (
-                     <span className="material-symbols-outlined text-[12px] text-slate-700">no_photography</span>
-                   )}
+                      </a>
+                    ) : (
+                      <span className="material-symbols-outlined text-[12px] text-slate-700">no_photography</span>
+                    )}
+                  </div>
                 </div>
+                {!expense.is_void && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleVoidExpense(expense.id); }}
+                    className="size-8 rounded-lg flex items-center justify-center text-slate-700 hover:text-status-overdue hover:bg-status-overdue/10 transition-all opacity-0 group-hover:opacity-100"
+                    title="Void this expense"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">cancel</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

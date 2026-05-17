@@ -32,13 +32,15 @@ export async function getExpenses(
     .select('*')
     .eq('business_id', businessId)
     .gte('expense_date', period.dateFrom)
-    .lte('expense_date', period.dateTo);
+    .lte('expense_date', period.dateTo)
+    .neq('is_void', true);
 
   if (error) {
     throw new Error(`[Expenses] DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Defensive: also filter in JS in case DB column is missing on older schemas
+  const rows = (data ?? []).filter(row => row.is_void !== true);
 
   let total_incl_vat = 0;
   let total_vat = 0;

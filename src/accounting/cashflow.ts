@@ -59,16 +59,18 @@ export async function getCashOut(
 ): Promise<number> {
   const { data, error } = await supabase
     .from('expenses')
-    .select('amount')
+    .select('amount, is_void')
     .eq('business_id', businessId)
     .gte('expense_date', period.dateFrom)
-    .lte('expense_date', period.dateTo);
+    .lte('expense_date', period.dateTo)
+    .neq('is_void', true);
 
   if (error) {
     throw new Error(`[CashFlow] getCashOut DB error: ${error.message}`);
   }
 
-  const rows = data ?? [];
+  // Defensive: also filter in JS
+  const rows = (data ?? []).filter(row => row.is_void !== true);
   const total = rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
   return round2(total);
 }

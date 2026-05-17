@@ -64,7 +64,7 @@ export default function Invoices() {
   // New Invoice State
   const isVatRegistered = business?.is_vat_registered ?? false;
   const invoicePrefix = business?.invoice_prefix || 'INV';
-  const paymentTermsDays = business?.payment_terms_days ?? 14;
+  const paymentTermsDays = business?.payment_terms_days ?? 7;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

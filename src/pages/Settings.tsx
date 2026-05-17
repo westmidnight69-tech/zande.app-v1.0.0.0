@@ -64,6 +64,7 @@ export default function Settings() {
         phone: profile.phone,
         email: profile.email,
         is_vat_registered: profile.is_vat_registered,
+        financial_year_end: profile.financial_year_end,
         invoice_prefix: profile.invoice_prefix,
         payment_terms_days: profile.payment_terms_days,
         invoice_footer_note: profile.invoice_footer_note,

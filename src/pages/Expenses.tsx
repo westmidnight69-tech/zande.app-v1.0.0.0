@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ExpenseSkeleton, Skeleton } from '../components/Skeleton';
 import Modal from '../components/Modal';
@@ -19,20 +19,124 @@ interface Expense {
   receipt_url: string | null;
 }
 
-const CATEGORIES = [
-  'COST_OF_SALES',
-  'SALARIES',
-  'RENT',
-  'UTILITIES',
-  'MARKETING',
-  'TRAVEL',
-  'EQUIPMENT',
-  'PROFESSIONAL_FEES',
-  'OFFICE_SUPPLIES',
-  'MEALS',
-  'TAX',
-  'OTHER'
+// Default built-in categories (from the DB enum)
+const DEFAULT_CATEGORIES = [
+  'COST_OF_SALES', 'SALARIES', 'RENT', 'UTILITIES', 'MARKETING',
+  'TRAVEL', 'EQUIPMENT', 'PROFESSIONAL_FEES', 'OFFICE_SUPPLIES',
+  'MEALS', 'SUBSCRIPTIONS', 'BANK_CHARGES', 'INSURANCE', 'TAX', 'OTHER'
 ];
+
+/* ─── Combobox: searchable dropdown with inline "Add new" ─── */
+function ComboBox({ label, value, onChange, options, placeholder, icon }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  icon?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = options.filter(o =>
+    o.toLowerCase().includes(search.toLowerCase())
+  );
+  const showAddNew = search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase());
+
+  return (
+    <div className="space-y-1.5 w-full" ref={ref}>
+      <label className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold px-1">
+        {label}
+      </label>
+      <div className="relative">
+        <div
+          className="w-full bg-white border border-border-subtle rounded-xl px-4 py-3 text-sm text-black flex items-center gap-2 cursor-pointer hover:border-primary/40 transition-all"
+          onClick={() => setOpen(!open)}
+        >
+          {icon && <span className="material-symbols-outlined text-[18px] text-slate-400">{icon}</span>}
+          <span className={value ? 'text-black' : 'text-slate-400'}>
+            {value ? formatLabel(value) : (placeholder || 'Select...')}
+          </span>
+          <span className="material-symbols-outlined text-slate-400 ml-auto text-[20px]">
+            {open ? 'expand_less' : 'expand_more'}
+          </span>
+        </div>
+
+        {open && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl shadow-black/20 z-50 max-h-56 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Search input */}
+            <div className="p-2 border-b border-slate-100">
+              <input
+                autoFocus
+                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                placeholder={`Search or type new...`}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="overflow-y-auto max-h-40">
+              {/* Add new option */}
+              {showAddNew && (
+                <button
+                  className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-emerald-50 text-emerald-600 font-medium transition-colors"
+                  onClick={() => {
+                    onChange(search.trim().toUpperCase().replace(/\s+/g, '_'));
+                    setSearch('');
+                    setOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                  Add "{search.trim()}"
+                </button>
+              )}
+
+              {/* Clear selection */}
+              {value && (
+                <button
+                  className="w-full px-4 py-2 text-left text-[11px] font-mono text-slate-400 uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                  onClick={() => { onChange(''); setSearch(''); setOpen(false); }}
+                >
+                  Clear selection
+                </button>
+              )}
+
+              {/* Existing options */}
+              {filtered.map(opt => (
+                <button
+                  key={opt}
+                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 ${opt === value ? 'bg-slate-100 font-medium text-black' : 'text-slate-700'}`}
+                  onClick={() => { onChange(opt); setSearch(''); setOpen(false); }}
+                >
+                  {opt === value && <span className="material-symbols-outlined text-[14px] text-primary">check</span>}
+                  {formatLabel(opt)}
+                </button>
+              ))}
+
+              {filtered.length === 0 && !showAddNew && (
+                <p className="px-4 py-3 text-sm text-slate-400 text-center">No matches</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatLabel(s: string) {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bOf\b/g, 'of');
+}
 
 export default function Expenses() {
   const { business, user, sessionId } = useAuth();
@@ -40,7 +144,7 @@ export default function Expenses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('ALL');
-  
+
   // Interaction State
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -61,9 +165,54 @@ export default function Expenses() {
     receipt_url: ''
   });
 
+  // Lookup lists (from DB)
+  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+  const [descriptionOptions, setDescriptionOptions] = useState<string[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+
+  // Merged category list = defaults + custom
+  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])];
+
   useEffect(() => {
     fetchExpenses();
-  }, [activeCategory, sortBy, sortOrder]);
+    fetchLookups();
+  }, [activeCategory, sortBy, sortOrder, business?.id]);
+
+  async function fetchLookups() {
+    if (!business?.id) return;
+
+    // Fetch saved suppliers
+    const { data: suppliers } = await supabase
+      .from('expense_suppliers')
+      .select('name')
+      .eq('business_id', business.id)
+      .order('name');
+    if (suppliers) setSupplierOptions(suppliers.map(s => s.name));
+
+    // Fetch saved descriptions
+    const { data: descriptions } = await supabase
+      .from('expense_descriptions')
+      .select('text')
+      .eq('business_id', business.id)
+      .order('text');
+    if (descriptions) setDescriptionOptions(descriptions.map(d => d.text));
+
+    // Fetch custom categories
+    const { data: cats } = await supabase
+      .from('expense_categories')
+      .select('name')
+      .eq('business_id', business.id)
+      .order('name');
+    if (cats) setCustomCategories(cats.map(c => c.name));
+  }
+
+  async function saveLookupIfNew(table: string, field: string, value: string) {
+    if (!business?.id || !value.trim()) return;
+    await supabase.from(table).upsert(
+      { business_id: business.id, [field]: value.trim() },
+      { onConflict: `business_id,${field}` }
+    );
+  }
 
   async function fetchExpenses() {
     if (!business?.id) return;
@@ -154,6 +303,17 @@ export default function Expenses() {
     if (error) {
       alert(error.message);
     } else {
+      // Save lookups for future reuse
+      await Promise.all([
+        saveLookupIfNew('expense_suppliers', 'name', newExpense.supplier),
+        saveLookupIfNew('expense_descriptions', 'text', newExpense.description),
+      ]);
+
+      // Save custom category if it's not a default one
+      if (!DEFAULT_CATEGORIES.includes(newExpense.category)) {
+        await saveLookupIfNew('expense_categories', 'name', newExpense.category);
+      }
+
       // Log Audit
       await logAuditAction({
         business_id: business.id,
@@ -165,7 +325,7 @@ export default function Expenses() {
         new_data: expenseData
       });
 
-      // 3. Post to Ledger
+      // Post to Ledger
       try {
         await ledgerService.postExpense(business.id, expenseData);
       } catch (ledgerError) {
@@ -173,6 +333,7 @@ export default function Expenses() {
       }
 
       fetchExpenses();
+      fetchLookups(); // Refresh dropdown options
       setIsModalOpen(false);
       setNewExpense({
         description: '',
@@ -256,7 +417,7 @@ export default function Expenses() {
         >
           ALL
         </button>
-        {CATEGORIES.map(cat => (
+        {allCategories.map(cat => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
@@ -309,7 +470,7 @@ export default function Expenses() {
                 <h3 className="font-semibold text-sm text-slate-100 truncate group-hover:text-white">
                   {expense.supplier || expense.description}
                 </h3>
-                <div className="flex Gabriel items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest truncate">
                     {new Date(expense.expense_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
                   </p>
@@ -375,19 +536,25 @@ export default function Expenses() {
         }
       >
         <form className="space-y-6">
-          <Input 
-            label="Description" 
-            placeholder="What was this for?" 
-            required
+          {/* Description ComboBox */}
+          <ComboBox
+            label="Description"
             value={newExpense.description}
-            onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+            onChange={(v) => setNewExpense({ ...newExpense, description: v })}
+            options={descriptionOptions}
+            placeholder="What was this for?"
+            icon="description"
           />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input 
-              label="Supplier" 
-              placeholder="Store / Vendor name"
+            {/* Supplier ComboBox */}
+            <ComboBox
+              label="Supplier"
               value={newExpense.supplier}
-              onChange={(e) => setNewExpense({ ...newExpense, supplier: e.target.value })}
+              onChange={(v) => setNewExpense({ ...newExpense, supplier: v })}
+              options={supplierOptions}
+              placeholder="Store / Vendor"
+              icon="storefront"
             />
             <Input 
               label="Amount" 
@@ -398,19 +565,16 @@ export default function Expenses() {
               onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
             />
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select 
+            {/* Category ComboBox */}
+            <ComboBox
               label="Category"
-              options={[
-                { value: 'OTHER', label: 'Other' },
-                { value: 'MEALS', label: 'Meals' },
-                { value: 'TRAVEL', label: 'Travel' },
-                { value: 'SUBSCRIPTIONS', label: 'Subscriptions' },
-                { value: 'UTILITIES', label: 'Utilities' },
-                { value: 'OFFICE_SUPPLIES', label: 'Office Supplies' }
-              ]}
               value={newExpense.category}
-              onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+              onChange={(v) => setNewExpense({ ...newExpense, category: v || 'OTHER' })}
+              options={allCategories}
+              placeholder="Select category"
+              icon="category"
             />
             <Input 
               label="Date"
@@ -466,4 +630,3 @@ export default function Expenses() {
     </div>
   );
 }
-

@@ -222,7 +222,7 @@ export default function Invoices() {
     doc.text(invoice.invoice_number, 150, 22);
     
     // Client Information
-    doc.setTextColor(31, 41, 55);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('BILL TO:', 20, 55);
@@ -294,21 +294,21 @@ export default function Invoices() {
     } else {
       y += 8;
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(150, 150, 150);
+      doc.setTextColor(0, 0, 0);
       doc.text('Not a VAT-registered vendor', 145, y);
-      doc.setTextColor(31, 41, 55);
+      doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'bold');
     }
 
     y += 8;
     doc.text('Total Amount:', 145, y);
     doc.setFontSize(14);
-    doc.setTextColor(31, 41, 55);
+    doc.setTextColor(0, 0, 0);
     doc.text(`R ${Number(invoice.total).toFixed(2)}`, 175, y);
     
     // Footer
     doc.setFontSize(10);
-    doc.setTextColor(156, 163, 175);
+    doc.setTextColor(0, 0, 0);
     const footerNote = business?.invoice_footer_note || 'Thank you for your business.';
     doc.text(footerNote, 105, 280, { align: 'center' });
 

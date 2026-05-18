@@ -28,9 +28,9 @@ const BRAND = {
   name: 'Zande',
   primaryColor: [31, 41, 55] as [number, number, number],     // slate-800
   bg: [255, 255, 255] as [number, number, number],            // white
-  textDark: [31, 41, 55] as [number, number, number],         // slate-800
+  textDark: [0, 0, 0] as [number, number, number],            // black
   textLight: [255, 255, 255] as [number, number, number],     // white
-  textMuted: [107, 114, 128] as [number, number, number],     // gray-500
+  textMuted: [0, 0, 0] as [number, number, number],           // black
   tableHeadBg: [243, 244, 246] as [number, number, number],   // gray-100
   successColor: [5, 150, 105] as [number, number, number],    // emerald-600
   dangerColor: [220, 38, 38] as [number, number, number],     // red-600

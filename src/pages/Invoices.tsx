@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
+import { useCachedQuery } from '../lib/cache';
 import { InvoiceSkeleton, Skeleton } from '../components/Skeleton';
 import Modal from '../components/Modal';
 import { Input, Select, PrimaryButton, SecondaryButton } from '../components/FormInputs';
@@ -44,11 +46,6 @@ interface CatalogueItem {
 
 export default function Invoices() {
   const { business, user, sessionId } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [catalogueItems, setCatalogueItems] = useState<CatalogueItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('ALL');
   
   // Interaction State
@@ -79,33 +76,32 @@ export default function Invoices() {
   const [newClientName, setNewClientName] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }]);
 
-  // Handlers declared before use
-  const fetchClients = async () => {
-    if (!business?.id) return;
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name')
+  // Caching integration
+  const fetchClients = useCallback(async () => {
+    if (!business?.id) return [];
+    const { data, error } = await api
+      .query('clients', 'id, name')
       .eq('business_id', business.id)
       .order('name');
-    if (data) setClients(data);
-  };
+    if (error) throw error;
+    return data || [];
+  }, [business?.id]);
 
-  const fetchCatalogueItems = async () => {
-    if (!business?.id) return;
-    const { data } = await supabase
-      .from('catalogue_items')
-      .select('id, name, description, unit_price')
+  const fetchCatalogueItems = useCallback(async () => {
+    if (!business?.id) return [];
+    const { data, error } = await api
+      .query('catalogue_items', 'id, name, description, unit_price')
       .eq('business_id', business.id)
       .order('name');
-    if (data) setCatalogueItems(data);
-  };
+    if (error) throw error;
+    return data || [];
+  }, [business?.id]);
 
-  const fetchInvoices = async () => {
-    if (!business?.id) return;
-    setLoading(true);
-    let query = supabase
-      .from('invoices')
-      .select('*, client:clients(name)')
+  const fetchInvoices = useCallback(async () => {
+    if (!business?.id) return [];
+    const sortColumn = sortBy === 'date' ? 'created_at' : 'amount_due';
+    let query = api
+      .query('invoices', '*, client:clients(name)')
       .eq('business_id', business.id);
 
     // Filtering
@@ -114,27 +110,22 @@ export default function Invoices() {
     }
 
     // Sorting
-    const sortColumn = sortBy === 'date' ? 'created_at' : 'amount_due';
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' });
 
     const { data, error } = await query;
-    if (error) setError(error.message);
-    else setInvoices((data as any[]) || []);
-    setLoading(false);
-  };
+    if (error) throw error;
+    return data || [];
+  }, [business?.id, activeTab, sortBy, sortOrder]);
 
-  useEffect(() => {
-    if (business?.id) {
-      fetchClients();
-      fetchCatalogueItems();
-    }
-  }, [business?.id]);
+  const clientsKey = business?.id ? `clients:lookup:${business.id}` : null;
+  const catalogueKey = business?.id ? `catalogue_items:lookup:${business.id}` : null;
+  const invoicesKey = business?.id ? `invoices:list:${business.id}:${activeTab}:${sortBy}:${sortOrder}` : null;
 
-  useEffect(() => {
-    if (business?.id) {
-      fetchInvoices();
-    }
-  }, [activeTab, sortBy, sortOrder, business?.id]);
+  const { data: clients = [] } = useCachedQuery<Client[]>(clientsKey, fetchClients);
+  const { data: catalogueItems = [] } = useCachedQuery<CatalogueItem[]>(catalogueKey, fetchCatalogueItems);
+  const { data: invoices = [], loading, error: queryError } = useCachedQuery<Invoice[]>(invoicesKey, fetchInvoices);
+
+  const error = queryError ? (queryError as any).message : null;
 
 
 
@@ -156,9 +147,8 @@ export default function Invoices() {
     setIsProcessingId(invoiceId);
     
     // update in supabase
-    const { error } = await supabase
-      .from('invoices')
-      .update({ status: newStatus })
+    const { error } = await api
+      .update('invoices', { status: newStatus })
       .eq('id', invoiceId);
       
     if (!error && business?.id) {
@@ -166,9 +156,8 @@ export default function Invoices() {
       if (newStatus === 'VOID') {
         try {
           // Find the transaction ID for this invoice
-          const { data: tx } = await supabase
-            .from('transactions')
-            .select('id')
+          const { data: tx } = await api
+            .query('transactions', 'id')
             .eq('reference_type', 'invoice')
             .eq('reference_id', invoiceId)
             .single();
@@ -191,10 +180,8 @@ export default function Invoices() {
         entity_id: invoiceId,
         new_data: { status: newStatus }
       });
-      // update local state
-      setInvoices(invoices.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus } : inv));
     } else if (error) {
-      alert('Failed to update status');
+      alert('Failed to update status: ' + error.message);
     }
     
     setIsProcessingId(null);
@@ -258,11 +245,11 @@ export default function Invoices() {
     // Fetch line items if they are not already in the invoice object
     let lineItems = invoice.items;
     if (!lineItems || lineItems.length === 0) {
-      const { data } = await supabase
-        .from('line_items')
-        .select('*')
+      const { data, error: lineError } = await api
+        .query('line_items')
         .eq('invoice_id', invoice.id)
         .order('sort_order');
+      if (lineError) throw lineError;
       lineItems = data || [];
     }
 
@@ -316,21 +303,24 @@ export default function Invoices() {
     const safeInvNum = invoice.invoice_number.replace(/[^a-zA-Z0-9-]/g, '');
     const fileName = `${business.id}/invoices/${safeInvNum}_${Date.now()}.pdf`;
     
-    const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(fileName, pdfBlob, {
+    const { error: uploadError } = await api.upload(
+      'receipts',
+      fileName,
+      pdfBlob,
+      {
         contentType: 'application/pdf',
         upsert: true
-      });
+      }
+    );
 
-    if (uploadError) throw uploadError;
+    if (uploadError) throw new Error(uploadError.message);
 
     const { data: { publicUrl } } = supabase.storage
       .from('receipts')
       .getPublicUrl(fileName);
 
     // Save metadata to documents table
-    await supabase.from('documents').insert([{
+    const { error: docError } = await api.insert('documents', {
       filename: fileName.split('/').pop(),
       original_filename: `${invoice.invoice_number}.pdf`,
       file_size: pdfBlob.size,
@@ -343,7 +333,9 @@ export default function Invoices() {
       business_id: business.id,
       uploaded_by: user?.id,
       session_id: sessionId
-    }]);
+    });
+
+    if (docError) throw new Error(docError.message);
 
     return { doc, publicUrl, pdfBlob };
   };
@@ -424,14 +416,13 @@ export default function Invoices() {
     // 0. Handle New Client Sync
     if (isNewClient) {
       if (!business?.id) return;
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .insert([{ 
+      const { data: clientData, error: clientError } = await api
+        .insert('clients', { 
           name: newClientName,
           business_id: business.id,
           created_by: user?.id,
           session_id: sessionId
-        }])
+        })
         .select()
         .single();
       
@@ -441,7 +432,6 @@ export default function Invoices() {
         return;
       }
       clientId = clientData.id;
-      fetchClients(); // Update local list
     }
 
     const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
@@ -450,9 +440,8 @@ export default function Invoices() {
 
     // 1. Create Invoice
     if (!business?.id) return;
-    const { data: invoiceData, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert([{
+    const { data: invoiceData, error: invoiceError } = await api
+      .insert('invoices', {
         ...newInvoice,
         client_id: clientId,
         subtotal: subtotal,
@@ -465,7 +454,7 @@ export default function Invoices() {
         business_id: business.id,
         created_by: user?.id,
         session_id: sessionId
-      }])
+      })
       .select()
       .single();
 
@@ -487,9 +476,8 @@ export default function Invoices() {
     });
 
     // 2. Add Items
-    const { error: itemsError } = await supabase
-      .from('line_items')
-      .insert(items.map((item, idx) => ({
+    const { error: itemsError } = await api
+      .insert('line_items', items.map((item, idx) => ({
         invoice_id: invoiceData.id,
         description: item.description,
         quantity: item.quantity,
@@ -516,18 +504,17 @@ export default function Invoices() {
       }
 
       setIsModalOpen(false);
-      fetchInvoices();
       setItems([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }]);
-          setNewInvoice({
-            client_id: '',
-            issue_date: new Date().toISOString().split('T')[0],
-            due_date: new Date(Date.now() + paymentTermsDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            invoice_number: `${invoicePrefix}-${Date.now().toString().slice(-6)}`,
-            status: 'SENT'
-          });
-        setIsNewClient(false);
-        setNewClientName('');
-      }
+      setNewInvoice({
+        client_id: '',
+        issue_date: new Date().toISOString().split('T')[0],
+        due_date: new Date(Date.now() + paymentTermsDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        invoice_number: `${invoicePrefix}-${Date.now().toString().slice(-6)}`,
+        status: 'SENT'
+      });
+      setIsNewClient(false);
+      setNewClientName('');
+    }
     setIsSubmitting(false);
   }
   const addItem = () => setItems([{ description: '', quantity: 1, unit_price: 0, type: 'Service' }, ...items]);

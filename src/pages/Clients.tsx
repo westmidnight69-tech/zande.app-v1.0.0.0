@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useCallback } from 'react';
 import { ClientSkeleton, Skeleton } from '../components/Skeleton';
 import Modal from '../components/Modal';
 import { Input, PrimaryButton, SecondaryButton } from '../components/FormInputs';
 import { useAuth } from '../components/AuthProvider';
 import { logAuditAction } from '../lib/audit';
+import { api } from '../lib/api';
+import { useCachedQuery } from '../lib/cache';
 
 interface Client {
   id: string;
@@ -17,9 +18,6 @@ interface Client {
 
 export default function Clients() {
   const { business, user, sessionId } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Interaction State
@@ -33,41 +31,35 @@ export default function Clients() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', vat_number: '' });
 
-  useEffect(() => {
-    fetchClients();
-  }, [sortBy, sortOrder]);
-
-  async function fetchClients() {
-    if (!business?.id) return;
-    setLoading(true);
+  const fetcher = useCallback(async () => {
+    if (!business?.id) return [];
     const sortColumn = sortBy === 'name' ? 'name' : 'total_outstanding';
     
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
+    const { data, error } = await api.query('clients')
       .eq('business_id', business.id)
       .order(sortColumn, { ascending: sortOrder === 'asc' });
     
-    if (error) setError(error.message);
-    else setClients(data || []);
-    setLoading(false);
-  }
+    if (error) throw error;
+    return data || [];
+  }, [business?.id, sortBy, sortOrder]);
+
+  const cacheKey = business?.id ? `clients:list:${business.id}:${sortBy}:${sortOrder}` : null;
+  const { data: clients = [], loading, error: queryError } = useCachedQuery<Client[]>(cacheKey, fetcher);
+  const error = queryError ? (queryError as any).message : null;
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
     
     if (!business?.id) return;
-    const { data: clientData, error } = await supabase
-      .from('clients')
-      .insert([{
-        ...newClient,
-        business_id: business.id,
-        created_by: user?.id,
-        session_id: sessionId
-      }])
-      .select()
-      .single();
+    const { data: clientData, error } = await api.insert('clients', {
+      ...newClient,
+      business_id: business.id,
+      created_by: user?.id,
+      session_id: sessionId
+    })
+    .select()
+    .single();
 
     if (error) {
       alert(error.message);
@@ -83,7 +75,6 @@ export default function Clients() {
         new_data: clientData
       });
 
-      fetchClients(); // Re-fetch to apply sort/order
       setIsModalOpen(false);
       setNewClient({ name: '', email: '', phone: '', vat_number: '' });
     }

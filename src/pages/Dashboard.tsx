@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useCallback, useMemo } from 'react';
 import Header from '../components/Header';
 import { Skeleton, StatSkeleton } from '../components/Skeleton';
 import { useAuth } from '../components/AuthProvider';
+import { api } from '../lib/api';
+import { useCachedQuery } from '../lib/cache';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -49,82 +50,77 @@ function StatusCard({ label, value, colorClass, loading, trend }: {
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { business } = useAuth();
 
-  const fetchStats = useCallback(async () => {
-      if (!business?.id) return;
-      setLoading(true);
-      
-      const now = new Date();
-      const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const lastOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-      
-      const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+  const fetcher = useCallback(async () => {
+    if (!business?.id) return null;
+    
+    const now = new Date();
+    const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const lastOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+    
+    const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+    const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
 
-      // Parallel fetch for consolidated data
-      const [
-        expensesResult, 
-        paymentsResult,
-        clientsCountResult,
-        invoicesResult
-      ] = await Promise.all([
-        // Fetch expenses for both months in one go
-        supabase.from('expenses').select('amount, expense_date').eq('business_id', business.id).gte('expense_date', firstOfLastMonth).lte('expense_date', lastOfThisMonth),
-        // Fetch payments for both months in one go
-        supabase.from('payments').select('amount, payment_date').eq('business_id', business.id).gte('payment_date', firstOfLastMonth).lte('payment_date', lastOfThisMonth),
-        // Keep clients count as is (it's a fast head request)
-        supabase.from('clients').select('id', { count: 'exact', head: true }).eq('business_id', business.id).eq('is_active', true),
-        // Consolidate all relevant invoices in one go
-        supabase.from('invoices').select('amount_due, status, total').eq('business_id', business.id)
-      ]);
+    // Parallel fetch for consolidated data using rate-limited API wrapper
+    const [
+      expensesResult, 
+      paymentsResult,
+      clientsResult,
+      invoicesResult
+    ] = await Promise.all([
+      api.query('expenses', 'amount, expense_date').eq('business_id', business.id).gte('expense_date', firstOfLastMonth).lte('expense_date', lastOfThisMonth),
+      api.query('payments', 'amount, payment_date').eq('business_id', business.id).gte('payment_date', firstOfLastMonth).lte('payment_date', lastOfThisMonth),
+      api.query('clients', 'id').eq('business_id', business.id).eq('is_active', true),
+      api.query('invoices', 'amount_due, status, total').eq('business_id', business.id)
+    ]);
 
-      const sum = (arr: any[], key: string) => arr?.reduce((acc, curr) => acc + Number(curr[key] || 0), 0) || 0;
+    if (expensesResult.error) throw expensesResult.error;
+    if (paymentsResult.error) throw paymentsResult.error;
+    if (clientsResult.error) throw clientsResult.error;
+    if (invoicesResult.error) throw invoicesResult.error;
 
-      // Filter expenses/payments in memory
-      const expenses = expensesResult.data || [];
-      const payments = paymentsResult.data || [];
-      const allInvoices = invoicesResult.data || [];
+    const sum = (arr: any[], key: string) => arr?.reduce((acc, curr) => acc + Number(curr[key] || 0), 0) || 0;
 
-      const totalExpensesThis = sum(expenses.filter(e => e.expense_date >= firstOfThisMonth), 'amount');
-      const totalExpensesPrev = sum(expenses.filter(e => e.expense_date >= firstOfLastMonth && e.expense_date <= lastOfLastMonth), 'amount');
-      
-      const totalCollectedThis = sum(payments.filter(p => p.payment_date >= firstOfThisMonth), 'amount');
-      const totalCollectedPrev = sum(payments.filter(p => p.payment_date >= firstOfLastMonth && p.payment_date <= lastOfLastMonth), 'amount');
+    // Filter expenses/payments in memory
+    const expenses = expensesResult.data || [];
+    const payments = paymentsResult.data || [];
+    const allInvoices = invoicesResult.data || [];
 
-      const activeInvoices = allInvoices.filter(i => !['PAID', 'SETTLED', 'VOID', 'DRAFT'].includes(i.status));
-      const totalOutstanding = sum(activeInvoices, 'amount_due');
-      const overdueCount = activeInvoices.filter(i => i.status === 'OVERDUE').length;
-      const draftsTotal = sum(allInvoices.filter(i => i.status === 'DRAFT'), 'total');
+    const totalExpensesThis = sum(expenses.filter((e: any) => e.expense_date >= firstOfThisMonth), 'amount');
+    const totalExpensesPrev = sum(expenses.filter((e: any) => e.expense_date >= firstOfLastMonth && e.expense_date <= lastOfLastMonth), 'amount');
+    
+    const totalCollectedThis = sum(payments.filter((p: any) => p.payment_date >= firstOfThisMonth), 'amount');
+    const totalCollectedPrev = sum(payments.filter((p: any) => p.payment_date >= firstOfLastMonth && p.payment_date <= lastOfLastMonth), 'amount');
 
-      const calculateTrend = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? { percentage: 100, isIncrease: true } : null;
-        const diff = ((current - previous) / previous) * 100;
-        if (Math.abs(diff) < 0.1) return null;
-        return { percentage: Math.abs(Math.round(diff)), isIncrease: diff >= 0 };
-      };
+    const activeInvoices = allInvoices.filter((i: any) => !['PAID', 'SETTLED', 'VOID', 'DRAFT'].includes(i.status));
+    const totalOutstanding = sum(activeInvoices, 'amount_due');
+    const overdueCount = activeInvoices.filter((i: any) => i.status === 'OVERDUE').length;
+    const draftsTotal = sum(allInvoices.filter((i: any) => i.status === 'DRAFT'), 'total');
 
-      setStats({
-        totalRevenue: totalCollectedThis,
-        totalOutstanding,
-        totalExpenses: totalExpensesThis,
-        draftsTotal,
-        paidCount: 0,
-        overdueCount,
-        clientCount: clientsCountResult.count ?? 0,
-        revenueTrend: calculateTrend(totalCollectedThis, totalCollectedPrev),
-        expenseTrend: calculateTrend(totalExpensesThis, totalExpensesPrev),
-      });
-      
-      setLoading(false);
+    const calculateTrend = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? { percentage: 100, isIncrease: true } : null;
+      const diff = ((current - previous) / previous) * 100;
+      if (Math.abs(diff) < 0.1) return null;
+      return { percentage: Math.abs(Math.round(diff)), isIncrease: diff >= 0 };
+    };
+
+    return {
+      totalRevenue: totalCollectedThis,
+      totalOutstanding,
+      totalExpenses: totalExpensesThis,
+      draftsTotal,
+      paidCount: 0,
+      overdueCount,
+      clientCount: clientsResult.data?.length ?? 0,
+      revenueTrend: calculateTrend(totalCollectedThis, totalCollectedPrev),
+      expenseTrend: calculateTrend(totalExpensesThis, totalExpensesPrev),
+    };
   }, [business?.id]);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  const cacheKey = business?.id ? `dashboard:stats:${business.id}` : null;
+  const { data: stats, loading } = useCachedQuery<DashboardStats>(cacheKey, fetcher);
 
   const fmt = useMemo(() => (n: number) => `R${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`, []);
 

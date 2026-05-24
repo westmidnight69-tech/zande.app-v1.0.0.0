@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { rateLimiter, RateLimitError } from '../lib/rate-limiter';
 import './Signup.css'; // Reusing the signup styles
 
 export default function Login() {
@@ -26,18 +27,26 @@ export default function Login() {
     setError(null);
 
     try {
+      // Rate limit check — block brute-force login attempts
+      rateLimiter.consume('auth');
+
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
       if (error) throw error;
       
-      // Success, redirect to dashboard
+      // Success — reset the auth bucket and redirect
+      rateLimiter.reset('auth');
       navigate('/');
       
     } catch (err: any) {
-      setError(err.message || 'Invalid login credentials.');
+      if (err instanceof RateLimitError) {
+        setError(`Too many login attempts. Please wait ${err.retryAfter} seconds before trying again.`);
+      } else {
+        setError(err.message || 'Invalid login credentials.');
+      }
     } finally {
       setLoading(false);
     }

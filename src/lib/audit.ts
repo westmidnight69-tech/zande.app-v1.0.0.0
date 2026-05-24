@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'UPLOAD' | 'DOWNLOAD' | 'VOID';
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'UPLOAD' | 'DOWNLOAD' | 'VOID' | 'RATE_LIMITED';
 
 interface AuditParams {
   business_id: string;

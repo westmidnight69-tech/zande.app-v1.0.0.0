@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { safeRequest } from '../lib/supabase-utils';
+import { clearCache } from '../lib/cache';
 
 interface AuthContextType {
   session: Session | null;
@@ -139,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setBusiness(null);
         setSessionId(null);
+        clearCache();
       }
     } catch (err) {
       console.error('Data fetching error:', err);
@@ -208,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    clearCache();
     if (sessionId) {
       await supabase
         .from('user_sessions')

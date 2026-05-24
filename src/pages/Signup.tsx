@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { rateLimiter, RateLimitError } from '../lib/rate-limiter';
+import { sanitizeString } from '../lib/sanitize';
 import './Signup.css';
 
 export default function Signup() {
@@ -33,6 +35,17 @@ export default function Signup() {
     setError(null);
     setSuccessMsg(null);
 
+    // Rate limit check — block rapid signup attempts
+    try {
+      rateLimiter.consume('auth');
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        setError(`Too many signup attempts. Please wait ${err.retryAfter} seconds before trying again.`);
+        setLoading(false);
+        return;
+      }
+    }
+
     const signupTimeout = setTimeout(() => {
       if (loading) {
         setLoading(false);
@@ -42,13 +55,13 @@ export default function Signup() {
 
     try {
       const { data, error: signupError } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
-            first_name: firstName,
-            last_name: lastName,
-            company_name: company
+            first_name: sanitizeString(firstName),
+            last_name: sanitizeString(lastName),
+            company_name: sanitizeString(company)
           }
         }
       });
@@ -66,6 +79,7 @@ export default function Signup() {
 
       if (currentSession) {
         setIsSignedUp(true);
+        rateLimiter.reset('auth');
         setSuccessMsg('Signup successful! Redirecting to workspace...');
         // We let the useEffect or a delayed navigate handle the move to /onboarding
         setTimeout(() => {

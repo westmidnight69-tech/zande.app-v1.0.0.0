@@ -34,6 +34,7 @@ export default function Reports() {
   const { business } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('exec'); // Default to Executive Summary for premium feel
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   
   // State for periods
   const [period, setPeriod] = useState<Period>({
@@ -328,19 +329,54 @@ export default function Reports() {
             </span>
           </button>
 
-          <button 
-            onClick={() => handleExport('excel')}
-            className="p-2.5 rounded-xl bg-surface border border-border-subtle text-slate-300 hover:text-slate-900 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">table_view</span>
-          </button>
-          <button 
-            onClick={() => handleExport('pdf')}
-            className="p-2.5 rounded-xl bg-primary border border-primary/50 text-slate-900 hover:bg-primary-hover transition-colors shadow-lg shadow-primary/10"
-            title="Export to PDF"
-          >
-            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              className="p-2.5 rounded-xl bg-primary border border-primary/50 text-slate-900 hover:bg-primary-hover transition-colors shadow-lg shadow-primary/10 flex items-center gap-2 font-bold text-sm"
+              title="Download Report"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span className="hidden xs:inline">Download</span>
+            </button>
+            
+            {showDownloadMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-48 bg-surface-muted border border-border-subtle rounded-xl shadow-xl z-50 overflow-hidden flex flex-col">
+                  <button 
+                    onClick={() => {
+                      handleExport('pdf');
+                      setShowDownloadMenu(false);
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors text-slate-200"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-rose-400">picture_as_pdf</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold">PDF Document</span>
+                      <span className="text-[10px] text-slate-400">Best for sharing</span>
+                    </div>
+                  </button>
+                  <div className="h-px w-full bg-border-subtle" />
+                  <button 
+                    onClick={() => {
+                      handleExport('excel');
+                      setShowDownloadMenu(false);
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors text-slate-200"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-emerald-400">table_view</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold">Spreadsheet</span>
+                      <span className="text-[10px] text-slate-400">Excel / CSV format</span>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

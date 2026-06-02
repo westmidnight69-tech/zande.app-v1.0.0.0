@@ -6,7 +6,8 @@ import { ledgerService } from '../lib/ledger';
 import { reconcile } from '../accounting/reconciliation';
 import type { ReconciliationResult } from '../accounting/types';
 import { format } from 'date-fns';
-import { ArrowUpRight, ArrowDownLeft, FileText, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, FileText, ShieldCheck, ShieldAlert, UploadCloud, CheckCircle, PlusCircle, Link as LinkIcon } from 'lucide-react';
+import { parseBankStatementExcel, matchTransactions, confirmInvoiceMatch, createExpenseFromBank, BankTransactionRow, ReconciliationMatch } from '../accounting/bankReconciliation';
 
 interface Account {
   id: string;
@@ -34,7 +35,7 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'chart' | 'journal' | 'trial'>('chart');
+  const [activeTab, setActiveTab] = useState<'chart' | 'journal' | 'trial' | 'statements'>('chart');
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['1', '4']));
   
   // Reconciliation State
@@ -122,7 +123,7 @@ export default function Accounts() {
 
       {/* Tabs */}
       <nav className="flex gap-1 mb-10 bg-surface/50 p-1 rounded-xl border border-border-subtle overflow-x-auto no-scrollbar">
-        {(['chart', 'journal', 'trial'] as const).map(tab => (
+        {(['chart', 'journal', 'trial', 'statements'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -132,7 +133,7 @@ export default function Accounts() {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            {tab === 'chart' ? 'Chart of Accounts' : tab === 'journal' ? 'Journal' : 'Trial Balance'}
+            {tab === 'chart' ? 'Chart of Accounts' : tab === 'journal' ? 'Journal' : tab === 'trial' ? 'Trial Balance' : 'Bank Statements'}
           </button>
         ))}
       </nav>
@@ -206,6 +207,7 @@ export default function Accounts() {
 
         {activeTab === 'journal' && <Journal businessId={business?.id || ''} />}
         {activeTab === 'trial' && <TrialBalance businessId={business?.id || ''} />}
+        {activeTab === 'statements' && <BankStatements businessId={business?.id || ''} />}
       </div>
 
       {/* FAB */}
@@ -336,6 +338,160 @@ function TrialBalance({ businessId }: { businessId: string }) {
       {totals.debit !== totals.credit && (
         <div className="p-4 bg-status-overdue/10 border-t border-status-overdue/30 text-status-overdue text-center text-[10px] font-mono uppercase tracking-widest font-bold">
           ⚠️ Warning: Ledger is out of balance by {(totals.debit - totals.credit).toFixed(2)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BankStatements({ businessId }: { businessId: string }) {
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<BankTransactionRow[]>([]);
+  const [matches, setMatches] = useState<ReconciliationMatch[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const parsedRows = await parseBankStatementExcel(file);
+      setRows(parsedRows);
+      
+      const foundMatches = await matchTransactions(businessId, parsedRows);
+      setMatches(foundMatches);
+    } catch (err: any) {
+      setError(err.message || 'Failed to parse Excel file. Ensure it is a valid format.');
+    } finally {
+      setLoading(false);
+      e.target.value = ''; // reset
+    }
+  };
+
+  const handleConfirmMatch = async (row: BankTransactionRow, match: ReconciliationMatch) => {
+    try {
+      setLoading(true);
+      if (match.appTransactionType === 'invoice') {
+        await confirmInvoiceMatch(businessId, row, match.appTransactionId);
+        setSuccess(`Successfully reconciled payment for ${match.description}`);
+      } else if (match.appTransactionType === 'expense') {
+        setSuccess(`Linked ${row.description} to Expense`);
+      }
+      
+      setRows(rows.filter(r => r !== row));
+      setMatches(matches.filter(m => m.bankTransactionId !== match.bankTransactionId));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateExpense = async (row: BankTransactionRow) => {
+    try {
+      setLoading(true);
+      const { data: cat } = await supabase.from('expense_categories').select('id').eq('business_id', businessId).limit(1).single();
+      if (!cat) throw new Error("No expense category found to map this to.");
+
+      await createExpenseFromBank(businessId, row, cat.id);
+      setSuccess(`Created expense for ${row.description}`);
+      setRows(rows.filter(r => r !== row));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-surface border border-border-subtle rounded-2xl p-8 text-center flex flex-col items-center justify-center border-dashed">
+         <UploadCloud className="text-slate-500 mb-4" size={48} />
+         <h3 className="text-lg font-bold text-slate-200 mb-2 font-display">Upload Bank Statement</h3>
+         <p className="text-sm text-slate-500 mb-6 max-w-md">
+           Upload your bank statement in Excel (.xlsx, .xls, .csv) format. We will automatically parse the transactions and suggest reconciliations.
+         </p>
+         <label className="bg-primary text-black font-bold text-xs uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-primary/90 cursor-pointer transition-colors flex items-center gap-2">
+           {loading ? 'Processing...' : 'Choose File'}
+           <input 
+             type="file" 
+             className="hidden" 
+             accept=".xlsx, .xls, .csv" 
+             onChange={handleFileUpload} 
+             disabled={loading}
+           />
+         </label>
+         {error && <p className="text-rose-500 mt-4 text-xs font-mono bg-rose-500/10 px-4 py-2 rounded border border-rose-500/20">{error}</p>}
+         {success && <p className="text-emerald-500 mt-4 text-xs font-mono bg-emerald-500/10 px-4 py-2 rounded border border-emerald-500/20">{success}</p>}
+      </div>
+
+      {rows.length > 0 && (
+        <div className="bg-surface border border-border-subtle rounded-2xl overflow-hidden">
+           <div className="bg-surface-muted px-6 py-4 border-b border-border-subtle flex justify-between items-center">
+             <h3 className="font-display font-bold text-slate-100 text-sm">Unreconciled Bank Transactions</h3>
+             <span className="bg-primary/10 text-primary text-[10px] font-mono font-bold px-2 py-1 rounded">{rows.length} PENDING</span>
+           </div>
+           
+           <div className="divide-y divide-border-subtle/30 max-h-[600px] overflow-y-auto">
+             {rows.map((row, idx) => {
+               const match = matches.find(m => m.bankTransactionId === `temp-${idx}`);
+
+               return (
+                 <div key={idx} className="p-4 hover:bg-surface/50 transition-colors">
+                   <div className="flex justify-between items-start mb-3">
+                     <div>
+                       <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">{format(new Date(row.date), 'dd MMM yyyy')}</span>
+                       <p className="text-sm font-bold text-slate-200 mt-1">{row.description}</p>
+                     </div>
+                     <div className={`text-right font-mono font-bold text-sm ${row.type === 'credit' ? 'text-emerald-400' : 'text-slate-300'}`}>
+                       {row.type === 'credit' ? '+' : '-'}{row.amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                     </div>
+                   </div>
+                   
+                   <div className="mt-4 pt-4 border-t border-border-subtle/30 flex items-center justify-between">
+                      {match ? (
+                        <div className="flex-1 flex items-center justify-between bg-emerald-500/5 border border-emerald-500/20 p-3 rounded-xl mr-4">
+                           <div className="flex items-center gap-3">
+                             <CheckCircle className="text-emerald-500" size={18} />
+                             <div>
+                               <p className="text-[10px] text-emerald-500/70 uppercase font-mono font-bold mb-0.5">Suggested Match ({(match.confidenceScore * 100).toFixed(0)}%)</p>
+                               <p className="text-xs text-emerald-400 font-bold">{match.description}</p>
+                             </div>
+                           </div>
+                           <button 
+                             onClick={() => handleConfirmMatch(row, match)}
+                             disabled={loading}
+                             className="bg-emerald-500 text-black px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider hover:bg-emerald-400 disabled:opacity-50"
+                           >
+                             Confirm Match
+                           </button>
+                        </div>
+                      ) : (
+                        <div className="flex-1 text-xs text-slate-500 font-mono italic">No automated match found.</div>
+                      )}
+                      
+                      <div className="flex gap-2">
+                        {row.type === 'debit' && !match && (
+                          <button 
+                            onClick={() => handleCreateExpense(row)}
+                            disabled={loading}
+                            className="flex items-center gap-2 bg-surface-muted text-slate-300 border border-border-subtle hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors"
+                          >
+                            <PlusCircle size={14} /> New Expense
+                          </button>
+                        )}
+                        <button className="flex items-center gap-2 bg-surface-muted text-slate-300 border border-border-subtle hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">
+                          <LinkIcon size={14} /> Link Manually
+                        </button>
+                      </div>
+                   </div>
+                 </div>
+               );
+             })}
+           </div>
         </div>
       )}
     </div>

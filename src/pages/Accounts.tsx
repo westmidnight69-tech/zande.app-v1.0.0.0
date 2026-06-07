@@ -6,8 +6,9 @@ import { ledgerService } from '../lib/ledger';
 import { reconcile } from '../accounting/reconciliation';
 import type { ReconciliationResult } from '../accounting/types';
 import { format } from 'date-fns';
-import { ArrowUpRight, ArrowDownLeft, FileText, ShieldCheck, ShieldAlert, UploadCloud, CheckCircle, PlusCircle, Link as LinkIcon, RefreshCw, BarChart2 } from 'lucide-react';
-import { parseAndValidateBankStatement, matchBankTransactions, approveReconciliation, BankTransactionRow, MatchSuggestion } from '../accounting/bankReconciliation';
+import { ArrowUpRight, ArrowDownLeft, FileText, ShieldCheck, ShieldAlert, UploadCloud, CheckCircle, PlusCircle, BarChart2 } from 'lucide-react';
+import { parseAndValidateBankStatement, matchBankTransactions, approveReconciliation } from '../accounting/bankReconciliation';
+import type { MatchSuggestion } from '../accounting/bankReconciliation';
 import ExpenseCreationModal from '../components/accounting/ExpenseCreationModal';
 
 interface Account {

@@ -1,4 +1,5 @@
-import { ledgerService, LedgerEntry } from '../lib/ledger';
+import { ledgerService } from '../lib/ledger';
+import type { LedgerEntry } from '../lib/ledger';
 
 export interface ExpensePostingParams {
   businessId: string;

@@ -37,7 +37,7 @@ async function computeHash(input: string): Promise<string> {
 export async function parseAndValidateBankStatement(
   file: File,
   businessId: string,
-  bankAccountId: string
+  _bankAccountId: string
 ): Promise<{
   rows: BankTransactionRow[];
   openingBalance: number;

@@ -77,26 +77,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
-  const fetchBusiness = async (userId: string, isSignInEvent: boolean = false) => {
+  const fetchBusiness = async (userId: string) => {
     try {
       const { data, error } = await safeRequest(() => supabase
         .from('businesses')
         .select('*')
         .eq('owner_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
       );
       
       if (!error && data) {
-        // If it's a fresh sign-in, increment the login count
-        if (isSignInEvent) {
-          const newCount = (data.login_count || 0) + 1;
-          await safeRequest(() => supabase
-            .from('businesses')
-            .update({ login_count: newCount })
-            .eq('id', data.id)
-          );
-          data.login_count = newCount;
-        }
         setBusiness(data);
       } else {
         setBusiness(null);
@@ -107,14 +99,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleAuthUpdate = async (newSession: Session | null, event?: string) => {
+  const handleAuthUpdate = async (newSession: Session | null) => {
     setSession(newSession);
     setUser(newSession?.user ?? null);
     
     try {
       if (newSession?.user) {
         await Promise.all([
-          fetchBusiness(newSession.user.id, event === 'SIGNED_IN'),
+          fetchBusiness(newSession.user.id),
           syncSession(newSession.user.id)
         ]);
       } else {
@@ -161,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (isMounted) {
-        await handleAuthUpdate(newSession, _event);
+        await handleAuthUpdate(newSession);
       }
     });
 

@@ -5,8 +5,9 @@ import { useAuth } from '../components/AuthProvider';
 import { ledgerService } from '../lib/ledger';
 import { format } from 'date-fns';
 import { ShieldCheck, UploadCloud, CheckCircle, PlusCircle, BarChart2 } from 'lucide-react';
-import { parseAndValidateBankStatement, matchBankTransactions, approveReconciliation } from '../accounting/bankReconciliation';
+import { processStatementFile, matchBankTransactions, approveReconciliation } from '../accounting/bankReconciliation';
 import type { MatchSuggestion } from '../accounting/bankReconciliation';
+import { uploadBankStatement } from '../accounting/storage';
 import ExpenseCreationModal from '../components/accounting/ExpenseCreationModal';
 
 interface BankAccount {
@@ -126,75 +127,89 @@ export default function BankAccounts() {
     setSuccess(null);
 
     try {
-      const parsed = await parseAndValidateBankStatement(file, business.id, activeAccount.id);
+      // 1. Upload the physical file
+      let fileUrl = '';
+      try {
+        fileUrl = await uploadBankStatement(file, business.id);
+      } catch (err) {
+        console.error('File upload failed, proceeding with processing anyway', err);
+      }
 
-      const { data: importHeader, error: importErr } = await supabase
-        .from('bank_statement_imports')
+      // 2. Process Statement (Parse, Normalize, Duplicate Check)
+      const { statementData, clean, duplicates, flagged } = await processStatementFile(file, business.id, activeAccount.id);
+
+      // 3. Create Statement Header Record
+      const { data: stmtHeader, error: stmtErr } = await supabase
+        .from('bank_statements')
         .insert({
           business_id: business.id,
           bank_account_id: activeAccount.id,
-          file_name: file.name,
-          statement_start_date: parsed.startDate,
-          statement_end_date: parsed.endDate,
-          opening_balance: parsed.openingBalance,
-          closing_balance: parsed.closingBalance,
+          source_file_url: fileUrl || file.name,
+          file_type: file.name.split('.').pop()?.toLowerCase(),
+          statement_period_start: statementData.startDate,
+          statement_period_end: statementData.endDate,
+          opening_balance: statementData.openingBalance,
+          closing_balance: statementData.closingBalance,
           uploaded_by: user?.id,
-          status: 'processing'
+          processing_status: 'completed'
         })
         .select()
         .single();
 
-      if (importErr || !importHeader) throw new Error(`Import header creation failed: ${importErr?.message}`);
+      if (stmtErr || !stmtHeader) throw new Error(`Statement header creation failed: ${stmtErr?.message}`);
 
-      const txsToInsert = parsed.rows.map(row => ({
+      // 4. Insert Clean and Flagged Transactions
+      const txsToInsert = [...clean, ...flagged].map(res => ({
         business_id: business.id,
-        import_id: importHeader.id,
+        import_id: stmtHeader.id,
         bank_account_id: activeAccount.id,
-        transaction_date: row.transaction_date,
-        description: row.description,
-        reference_number: row.reference_number,
-        debit: row.debit,
-        credit: row.credit,
-        balance: row.balance,
-        transaction_hash: row.transaction_hash,
-        reconciliation_status: 'unmatched'
+        transaction_date: res.transaction.date,
+        description: res.transaction.description,
+        normalized_description: res.transaction.normalized_description,
+        reference_number: res.transaction.reference,
+        debit: res.transaction.debit,
+        credit: res.transaction.credit,
+        amount: res.transaction.amount,
+        balance: res.transaction.balance,
+        transaction_hash: res.transaction.transaction_hash,
+        reconciliation_status: 'unmatched',
+        confidence_score: res.confidence
       }));
 
-      const { data: insertedTxs, error: insertErr } = await supabase
-        .from('bank_transactions')
-        .upsert(txsToInsert, { onConflict: 'business_id, transaction_hash' })
-        .select();
+      let insertedIds: string[] = [];
+      if (txsToInsert.length > 0) {
+        const { data: insertedTxs, error: insertErr } = await supabase
+          .from('bank_transactions')
+          .upsert(txsToInsert, { onConflict: 'business_id, transaction_hash' })
+          .select('id');
 
-      if (insertErr) throw new Error(`Transaction ingestion failed: ${insertErr.message}`);
+        if (insertErr) throw new Error(`Transaction ingestion failed: ${insertErr.message}`);
+        insertedIds = insertedTxs?.map(t => t.id) || [];
+      }
 
-      if (insertedTxs && insertedTxs.length > 0) {
-        const matchSuggestions = await matchBankTransactions(business.id, insertedTxs.map(t => t.id));
+      // 5. Run Matching Engine strictly on newly inserted valid rows
+      if (insertedIds.length > 0) {
+        const matchSuggestions = await matchBankTransactions(business.id, insertedIds);
         
         if (matchSuggestions.length > 0) {
           const suggestionsToInsert = matchSuggestions.map(s => ({
             business_id: business.id,
             bank_transaction_id: s.bankTransactionId,
             source_type: s.sourceType,
-            source_id: s.sourceId,
-            confidence: s.confidence,
-            match_method: s.matchMethod,
+            source_record_id: s.sourceId,
+            match_reason: s.matchReason,
             approved: false
           }));
-          await supabase.from('reconciliation_matches').insert(suggestionsToInsert);
+          await supabase.from('transaction_matches').insert(suggestionsToInsert);
         }
       }
 
       await supabase
-        .from('bank_statement_imports')
-        .update({ status: 'completed' })
-        .eq('id', importHeader.id);
-
-      await supabase
         .from('bank_accounts')
-        .update({ current_balance: parsed.closingBalance })
+        .update({ current_balance: statementData.closingBalance })
         .eq('id', activeAccount.id);
 
-      setSuccess(`Import successful! ${parsed.rows.length} transactions processed.`);
+      setSuccess(`Import successful! ${clean.length} new transactions added. ${duplicates.length} duplicates skipped. ${flagged.length} flagged for review.`);
       fetchData();
     } catch (err: any) {
       setError(err.message || 'Import failed.');
@@ -212,10 +227,9 @@ export default function BankAccounts() {
       const formattedMatch: MatchSuggestion = {
         bankTransactionId: match.bank_transaction_id,
         sourceType: match.source_type,
-        sourceId: match.source_id,
-        confidence: match.confidence,
-        matchMethod: match.match_method,
-        description: match.description || 'System match suggestion'
+        sourceId: match.source_record_id,
+        confidence: match.confidence || 0,
+        matchReason: match.match_reason || 'Manual match'
       };
 
       await approveReconciliation(business.id, txId, formattedMatch, user?.id || '');
@@ -256,10 +270,25 @@ export default function BankAccounts() {
 
   return (
     <div className="pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex items-center justify-between mb-8 overflow-hidden">
-        <div>
-          <h1 className="font-display text-4xl font-bold text-slate-100 tracking-tight">Banking</h1>
-          <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-1">Financial Institutions & Reconciliation</p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="font-display text-4xl font-bold text-slate-100 tracking-tight">Banking</h1>
+            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-1">Financial Institutions & Reconciliation</p>
+          </div>
+          {activeAccount && (
+            <label className="bg-surface-muted text-slate-200 border border-border-subtle font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface hover:text-white cursor-pointer transition-all flex items-center gap-2 shadow-sm">
+              <UploadCloud size={16} className="text-primary" />
+              {loading ? 'Processing...' : 'Upload Bank Statement'}
+              <input 
+                type="file" 
+                className="hidden" 
+                accept=".xlsx, .xls, .csv" 
+                onChange={handleFileUpload} 
+                disabled={loading}
+              />
+            </label>
+          )}
         </div>
       </header>
 
@@ -326,89 +355,105 @@ export default function BankAccounts() {
           
           <div className="flex items-center justify-between mb-4 mt-12">
             <h2 className="font-display text-2xl font-bold text-white tracking-tight">Reconciliation: {activeAccount.bank_name}</h2>
+            {activeAccount && (
+              <label className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 cursor-pointer transition-all px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(var(--color-primary),0.1)]">
+                <UploadCloud size={16} />
+                {loading ? 'Processing...' : 'Upload Statement'}
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf, .xlsx, .xls, .csv" 
+                  onChange={handleFileUpload} 
+                  disabled={loading}
+                />
+              </label>
+            )}
           </div>
 
           {error && <p className="text-rose-500 text-xs font-mono bg-rose-500/10 px-4 py-2 rounded border border-rose-500/20">{error}</p>}
           {success && <p className="text-emerald-500 text-xs font-mono bg-emerald-500/10 px-4 py-2 rounded border border-emerald-500/20">{success}</p>}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-2xl border ${
-              balanceDifference < 0.05
-                ? 'bg-emerald-500/5 border-emerald-500/20'
-                : 'bg-yellow-500/5 border-yellow-500/20'
-            }`}>
-              <div className="flex items-center gap-3">
-                <ShieldCheck className={balanceDifference < 0.05 ? 'text-emerald-500' : 'text-yellow-500'} size={24} />
-                <div>
-                  <p className="text-[10px] font-mono text-slate-500 uppercase font-bold">Bank vs Ledger Balance Check</p>
-                  <h4 className="text-sm font-bold text-slate-200 mt-1">
-                    {balanceDifference < 0.05 
-                      ? 'Balances In Sync' 
-                      : `Discrepancy: R${balanceDifference.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`
-                    }
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Bank Current Balance: R{bankCurrentBalance.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} | Ledger Bank Account: R{ledgerBalance.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[400px] bg-surface/20 border border-border-subtle rounded-3xl border-dashed p-12 mt-8 animate-in zoom-in-95 duration-500">
+              <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center mb-6 border border-primary/20 shadow-[0_0_40px_rgba(var(--color-primary),0.2)]">
+                <UploadCloud className="text-primary" size={40} />
               </div>
+              <h2 className="text-3xl font-display font-bold text-white mb-3 tracking-tight">Upload Bank Statement</h2>
+              <p className="text-slate-400 text-base max-w-lg text-center mb-10 leading-relaxed">
+                Import your bank statement in PDF, Excel (.xlsx, .xls) or CSV format to begin reconciliation. The ledger balance will only update once transactions are explicitly approved.
+              </p>
+              <label className="bg-primary text-black font-bold text-sm uppercase tracking-widest px-10 py-4 rounded-xl hover:bg-primary/90 cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(var(--color-primary),0.3)] flex items-center gap-3">
+                {loading ? 'Processing...' : 'Select File'}
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf, .xlsx, .xls, .csv" 
+                  onChange={handleFileUpload} 
+                  disabled={loading}
+                />
+              </label>
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`p-6 rounded-2xl border ${
+                  balanceDifference < 0.05
+                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                    : 'bg-yellow-500/5 border-yellow-500/20'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className={balanceDifference < 0.05 ? 'text-emerald-500' : 'text-yellow-500'} size={24} />
+                    <div>
+                      <p className="text-[10px] font-mono text-slate-500 uppercase font-bold">Bank vs Ledger Balance Check</p>
+                      <h4 className="text-sm font-bold text-slate-200 mt-1">
+                        {balanceDifference < 0.05 
+                          ? 'Balances In Sync' 
+                          : `Discrepancy: R${balanceDifference.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`
+                        }
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Bank Current Balance: R{bankCurrentBalance.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} | Ledger Bank Account: R{ledgerBalance.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="bg-surface/30 border border-border-subtle p-6 rounded-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BarChart2 className="text-primary" size={24} />
-                <div>
-                  <p className="text-[10px] font-mono text-slate-500 uppercase font-bold">Statement Reconciliation Rate</p>
-                  <h4 className="text-sm font-bold text-slate-200 mt-1">{reconciliationRate.toFixed(0)}% Complete</h4>
-                  <div className="w-48 bg-slate-800 h-2 rounded-full overflow-hidden mt-2">
-                    <div className="bg-primary h-full transition-all duration-500" style={{ width: `${reconciliationRate}%` }} />
+                <div className="bg-surface/30 border border-border-subtle p-6 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <BarChart2 className="text-primary" size={24} />
+                    <div>
+                      <p className="text-[10px] font-mono text-slate-500 uppercase font-bold">Statement Reconciliation Rate</p>
+                      <h4 className="text-sm font-bold text-slate-200 mt-1">{reconciliationRate.toFixed(0)}% Complete</h4>
+                      <div className="w-48 bg-slate-800 h-2 rounded-full overflow-hidden mt-2">
+                        <div className="bg-primary h-full transition-all duration-500" style={{ width: `${reconciliationRate}%` }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
-              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Total Deposits</p>
-              <p className="text-xl font-bold font-mono text-emerald-400 mt-2">R{totalDeposits.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
-              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Total Withdrawals</p>
-              <p className="text-xl font-bold font-mono text-slate-200 mt-2">R{totalWithdrawals.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
-              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Net Cash Flow</p>
-              <p className={`text-xl font-bold font-mono mt-2 ${netMovement >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                R{netMovement.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
-              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Pending Rows</p>
-              <p className="text-xl font-bold font-mono text-primary mt-2">{transactions.length}</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Total Deposits</p>
+                  <p className="text-xl font-bold font-mono text-emerald-400 mt-2">R{totalDeposits.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Total Withdrawals</p>
+                  <p className="text-xl font-bold font-mono text-slate-200 mt-2">R{totalWithdrawals.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Net Cash Flow</p>
+                  <p className={`text-xl font-bold font-mono mt-2 ${netMovement >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    R{netMovement.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="bg-surface border border-border-subtle p-5 rounded-2xl">
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Pending Rows</p>
+                  <p className="text-xl font-bold font-mono text-primary mt-2">{transactions.length}</p>
+                </div>
+              </div>
 
-          <div className="bg-surface border border-border-subtle rounded-2xl p-8 text-center flex flex-col items-center justify-center border-dashed">
-             <UploadCloud className="text-slate-500 mb-4" size={48} />
-             <h3 className="text-lg font-bold text-slate-200 mb-2 font-display">Upload Bank Statement</h3>
-             <p className="text-sm text-slate-500 mb-6 max-w-md">
-               Import your bank statement in Excel (.xlsx, .xls, .csv) format. The ledger balance will only update once transactions are explicitly approved.
-             </p>
-             <label className="bg-primary text-black font-bold text-xs uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-primary/90 cursor-pointer transition-colors flex items-center gap-2">
-               {loading ? 'Processing...' : 'Choose File'}
-               <input 
-                 type="file" 
-                 className="hidden" 
-                 accept=".xlsx, .xls, .csv" 
-                 onChange={handleFileUpload} 
-                 disabled={loading}
-               />
-             </label>
-          </div>
-
-          {transactions.length > 0 && (
-            <div className="bg-surface border border-border-subtle rounded-2xl overflow-hidden">
+              <div className="bg-surface border border-border-subtle rounded-2xl overflow-hidden mt-8">
                <div className="bg-surface-muted px-6 py-4 border-b border-border-subtle flex justify-between items-center">
                  <h3 className="font-display font-bold text-slate-100 text-sm">Unreconciled Bank Transactions</h3>
                  <span className="bg-primary/10 text-primary text-[10px] font-mono font-bold px-2 py-1 rounded">{transactions.length} PENDING</span>
@@ -484,8 +529,9 @@ export default function BankAccounts() {
                      </div>
                    );
                  })}
-               </div>
+              </div>
             </div>
+            </>
           )}
 
           {expenseModalOpen && selectedTx && business && (

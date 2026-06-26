@@ -32,12 +32,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [business, setBusiness] = useState<any | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Use refs to prevent concurrent/redundant processing of the same user state
-  const lastProcessedUserId = React.useRef<string | null>(undefined as any);
-  const initializationPromise = React.useRef<Promise<void> | null>(null);
-  // Guard against concurrent auth events firing simultaneously (e.g. getSession + onAuthStateChange)
-  const isHandlingAuth = React.useRef(false);
 
   const syncSession = async (userId: string, businessId?: string) => {
     try {
@@ -114,20 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleAuthUpdate = async (newSession: Session | null, event?: string) => {
-    // Drop concurrent calls — only one auth update should run at a time per tab
-    if (isHandlingAuth.current) return;
-    isHandlingAuth.current = true;
-
-    const userId = newSession?.user?.id ?? null;
-    
-    // Skip if we've already processed this user state
-    if (userId === lastProcessedUserId.current) {
-      setLoading(false);
-      isHandlingAuth.current = false;
-      return;
-    }
-    lastProcessedUserId.current = userId;
-
     setSession(newSession);
     setUser(newSession?.user ?? null);
     
@@ -146,7 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Data fetching error:', err);
     } finally {
       setLoading(false);
-      isHandlingAuth.current = false;
     }
   };
 
@@ -163,47 +142,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('Auth initialization timed out - forcing loading false');
     }, 15000);
 
+    let isMounted = true;
+
     const performInit = async () => {
       try {
-        let { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const devEmail = import.meta.env.VITE_DEV_LOGIN_EMAIL;
-        const devPass = import.meta.env.VITE_DEV_LOGIN_PASSWORD;
-
-        if (!currentSession && isLocalhost && devEmail && devPass && devPass !== 'YourPasswordHere') {
-          const hasTried = sessionStorage.getItem('zande_auto_login_tried');
-          if (!hasTried) {
-            sessionStorage.setItem('zande_auto_login_tried', 'true');
-            try {
-              const { data } = await supabase.auth.signInWithPassword({
-                email: devEmail,
-                password: devPass,
-              });
-              if (data.session) currentSession = data.session;
-            } catch (e) {
-              console.error('Auto-login failed:', e);
-            }
-          }
+        if (isMounted) {
+          await handleAuthUpdate(currentSession);
         }
-
-        await handleAuthUpdate(currentSession);
       } catch (err) {
         console.error('Auth initialization error:', err);
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    initializationPromise.current = performInit();
+    performInit();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      if (initializationPromise.current) {
-        await initializationPromise.current;
+      if (isMounted) {
+        await handleAuthUpdate(newSession, _event);
       }
-      handleAuthUpdate(newSession, _event);
     });
 
     return () => {
+      isMounted = false;
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };

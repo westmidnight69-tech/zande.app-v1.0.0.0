@@ -44,8 +44,12 @@ export default function Login() {
     } catch (err: any) {
       if (err instanceof RateLimitError) {
         setError(`Too many login attempts. Please wait ${err.retryAfter} seconds before trying again.`);
+      } else if (err.message?.toLowerCase().includes('failed to fetch') || err.message?.toLowerCase().includes('networkerror')) {
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+      } else if (err.message?.includes('Invalid login credentials')) {
+        setError('Incorrect email or password. Please try again.');
       } else {
-        setError(err.message || 'Invalid login credentials.');
+        setError(err.message || 'An unexpected error occurred. Please try again.');
       }
     } finally {
       setLoading(false);

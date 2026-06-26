@@ -414,8 +414,6 @@ export default function BankAccounts() {
           .insert({
             business_id: business.id,
             bank_name: 'Primary Business Bank',
-            account_name: 'Main Transactional Account',
-            account_number_masked: '•••• 1234',
             account_number: '•••• 1234',
             account_type: 'Cheque',
             opening_balance: 0,
@@ -695,7 +693,7 @@ export default function BankAccounts() {
       </div>
 
       {/* ── Main Content: Upload or Dashboard ── */}
-      {activeAccount && (
+      {activeAccount ? (
         <div>
           {loading && !uploadLoading ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -733,7 +731,24 @@ export default function BankAccounts() {
             </div>
           )}
         </div>
-      )}
+      ) : !loading ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] bg-surface/20 border border-border-subtle rounded-3xl border-dashed p-12 mt-8 animate-in zoom-in-95 duration-500">
+          <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center mb-6 border border-primary/20 shadow-[0_0_40px_rgba(var(--color-primary),0.2)]">
+            <span className="material-symbols-outlined text-primary text-[40px]">account_balance</span>
+          </div>
+          <h2 className="text-3xl font-display font-bold text-white mb-3 tracking-tight">No Bank Accounts Found</h2>
+          <p className="text-slate-400 text-base max-w-lg text-center mb-10 leading-relaxed">
+            You don't have any bank accounts set up yet. Once you connect an account or upload a statement, your financial dashboard will appear here.
+          </p>
+          <button 
+            disabled={true}
+            className="bg-primary text-black font-bold text-sm uppercase tracking-widest px-10 py-4 rounded-xl opacity-50 cursor-not-allowed shadow-[0_0_30px_rgba(var(--color-primary),0.3)] flex items-center gap-3"
+          >
+            <PlusCircle size={18} />
+            Add Account (Coming Soon)
+          </button>
+        </div>
+      ) : null}
 
       {/* ── Expense Modal ── */}
       {expenseModalOpen && selectedTx && business && (
